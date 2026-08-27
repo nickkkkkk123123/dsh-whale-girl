@@ -23,4 +23,40 @@ export const WIDGET_CSS = `
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-9px); }
 }
+.wg-context {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(80, 110, 190, 0.25);
+  border-radius: 8px;
+  padding: 4px 6px;
+  backdrop-filter: blur(4px);
+}
+.wg-context-track {
+  height: 6px;
+  background: rgba(80, 110, 190, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.wg-context-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 400ms ease, background 400ms ease;
+}
+.wg-context-detail {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #2a3a66;
+}
+.wg-context-row {
+  white-space: nowrap;
+}
+.wg-warn {
+  color: #dc2626;
+  font-weight: 600;
+}
 `

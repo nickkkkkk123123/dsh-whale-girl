@@ -1,9 +1,20 @@
-import React, { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState, useCallback, useEffect } from 'react'
 import { WIDGET_CSS } from './styles'
+import { ContextBar, WhaleState } from './ContextBar'
 
 // DSH 运行时 Builtin（Client 侧），Package-private RPC 到宿主
 declare const host: {
   call(method: string, args?: unknown): Promise<unknown>
+}
+
+const EMPTY_STATE: WhaleState = {
+  balance: null,
+  currency: 'CNY',
+  todayUsage: 0,
+  contextPct: 0,
+  contextTokens: 0,
+  contextLimit: 128000,
+  lastTurnCost: null
 }
 
 export function WhaleWidget() {
@@ -13,7 +24,29 @@ export function WhaleWidget() {
     y: Math.max(0, window.innerHeight - 260)
   }))
   const [pressed, setPressed] = useState(false)
+  const [state, setState] = useState<WhaleState>(EMPTY_STATE)
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
+
+  // 数据轮询（60s）：余额/用量/上下文
+  useEffect(() => {
+    let alive = true
+    const load = () => {
+      host
+        .call('whale.getState')
+        .then((s) => {
+          if (alive && s && typeof s === 'object') setState(s as WhaleState)
+        })
+        .catch(() => {
+          // host 未就绪，忽略
+        })
+    }
+    load()
+    const t = window.setInterval(load, 60000)
+    return () => {
+      alive = false
+      window.clearInterval(t)
+    }
+  }, [])
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     const el = rootRef.current
@@ -68,6 +101,7 @@ export function WhaleWidget() {
         data-pressed={pressed}
       >
         <img className="wg-img" src="/dsh-whale-girl/whale-girl.png" alt="鲸鱼娘" draggable={false} />
+        <ContextBar pct={state.contextPct} tokens={state.contextTokens} limit={state.contextLimit} />
       </div>
     </>
   )
