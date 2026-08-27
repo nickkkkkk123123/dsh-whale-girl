@@ -10,6 +10,7 @@ export class SoundEngine {
   private duckRelease: HTMLAudioElement | null = null
   private actx: AudioContext | null = null
   private bounceBuf: AudioBuffer | null = null
+  onPlayResult?: (ok: boolean, err?: string) => void
 
   constructor() {
     if (typeof window === 'undefined') return
@@ -20,6 +21,15 @@ export class SoundEngine {
       if (AC) this.actx = new AC()
     } catch {
       this.actx = null
+    }
+  }
+
+  /** 诊断：返回音频状态，用于排查音效不发声 */
+  debug(): { actxState: string | null; duckPressReady: number | null; duckReleaseReady: number | null } {
+    return {
+      actxState: this.actx ? this.actx.state : null,
+      duckPressReady: this.duckPress ? this.duckPress.readyState : null,
+      duckReleaseReady: this.duckRelease ? this.duckRelease.readyState : null
     }
   }
 
@@ -57,7 +67,7 @@ export class SoundEngine {
       this.play(this.duckPress)
       return
     }
-    this.cute(520, 0.09, 'square', 0.14)
+    this.cute(520, 0.09, 'square', 0.32)
   }
 
   release() {
@@ -66,57 +76,25 @@ export class SoundEngine {
       this.play(this.duckRelease)
       return
     }
-    this.cute(760, 0.08, 'sine', 0.11)
+    this.cute(760, 0.08, 'sine', 0.28)
   }
 
-  /** 撞边反馈音：duck 复用小黄鸭松手声，cute 用短促"boing"波。 */
+  /** 撞边反馈音：用 HTMLAudioElement（duck 松手音）播放——不依赖 AudioContext（弹跳在非用户手势下 ctx 会被挂起、resume 被拒导致无声） */
   bounce() {
-    if (this.mode === 'duck') {
-      this.ensureDuck()
-      this.play(this.duckRelease)
-      return
-    }
-    const ctx = this.actx
-    if (!ctx) return
-    const doPlay = () => {
-      try {
-        // 预生成一次短促"boing"音采样，之后每次用 BufferSource 播放（比反复新建振荡器更省资源、更稳，避免多次弹跳后声音消失）
-        if (!this.bounceBuf) {
-          const sr = ctx.sampleRate
-          const len = Math.floor(sr * 0.15)
-          const buf = ctx.createBuffer(1, len, sr)
-          const data = buf.getChannelData(0)
-          for (let i = 0; i < len; i++) {
-            const t = i / len
-            const f = 420 * Math.pow(0.55, t)
-            data[i] = Math.sin(2 * Math.PI * f * (i / sr)) * (1 - t) * 0.24
-          }
-          this.bounceBuf = buf
-        }
-        const src = ctx.createBufferSource()
-        src.buffer = this.bounceBuf
-        src.connect(ctx.destination)
-        src.start()
-      } catch {
-        // ignore
-      }
-    }
-    if (ctx.state === 'suspended') {
-      void ctx.resume().then(doPlay).catch(() => {})
-    } else {
-      doPlay()
-    }
+    this.ensureDuck()
+    this.play(this.duckRelease)
   }
 
   private play(a: HTMLAudioElement | null) {
     if (!a) return
     try {
       a.currentTime = 0
-      void a.play().catch(() => {
-        // autoplay 被拒则静默
-      })
-    } catch {
-      // ignore
+      a.volume = 1
+      void a.play()
+        .then(() => this.onPlayResult?.(true))
+        .catch((e) => this.onPlayResult?.(false, String(e?.message || e)))
+    } catch (e) {
+      this.onPlayResult?.(false, String(e))
     }
   }
 
@@ -137,8 +115,9 @@ export class SoundEngine {
         g.connect(ctx.destination)
         osc.start(t)
         osc.stop(t + dur + 0.02)
-      } catch {
-        // ignore
+        this.onPlayResult?.(true)
+      } catch (e) {
+        this.onPlayResult?.(false, String(e))
       }
     }
     // 若 AudioContext 处于 suspended（浏览器音频策略/空闲挂起），先 resume 完成再播放，避免连续音效丢声

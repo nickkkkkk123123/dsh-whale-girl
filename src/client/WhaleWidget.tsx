@@ -27,7 +27,7 @@ const CONFIG_KEY = 'whale-girl-config'
 const WIDGET_W = 170
 const WIDGET_H = 180
 /** 松手速度（px/s）超过此值进入甩抛弹跳模式。 */
-const FLING_SPEED = 1200
+const FLING_SPEED = 800
 
 function normalizeConfig(o: unknown): MenuConfig {
   const any = (o && typeof o === 'object' ? o : {}) as Record<string, unknown>
@@ -74,6 +74,7 @@ export function WhaleWidget() {
   const flingRef = useRef<{ cancel: () => void } | null>(null)
   const bounceTimerRef = useRef(0)
   const petTimerRef = useRef(0)
+  const posRef = useRef(pos)
   const eggRef = useRef(new EasterEgg())
   const soundRef = useRef<SoundEngine | null>(null)
   if (soundRef.current === null) soundRef.current = new SoundEngine()
@@ -213,8 +214,10 @@ export function WhaleWidget() {
       setPressed(true)
       setDragging(true)
       soundRef.current?.unlock()
+      if (soundRef.current) soundRef.current.onPlayResult = (ok, err) => reportEvent('play', { ok, err })
       soundRef.current?.press()
       reportEvent('sound', { kind: 'press' })
+      reportEvent('audio-debug', soundRef.current?.debug() as Record<string, unknown>)
       try {
         ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
       } catch {
@@ -264,6 +267,7 @@ export function WhaleWidget() {
         if (el) {
           const rect = el.getBoundingClientRect()
           setFlinging(true)
+          let bounced = false
           flingRef.current = startFling({
             x: rect.left,
             y: rect.top,
@@ -273,6 +277,7 @@ export function WhaleWidget() {
             height: WIDGET_H,
             onMove: (x, y) => setPos({ x, y }),
             onBounce: (axis) => {
+              bounced = true
               reportEvent('bounce', { axis })
               reportEvent('sound', { kind: 'bounce' })
               soundRef.current?.bounce()
@@ -284,6 +289,11 @@ export function WhaleWidget() {
             onDone: (x, y) => {
               flingRef.current = null
               setFlinging(false)
+              // 未撞边（低速）也播一次弹跳完成音
+              if (!bounced) {
+                soundRef.current?.bounce()
+                reportEvent('sound', { kind: 'bounce' })
+              }
               snap(x, y)
             }
           })
@@ -305,6 +315,55 @@ export function WhaleWidget() {
     },
     [shake, snap, config.showBubble, reportEvent]
   )
+
+  // 窗口变化：把挂件 clamp 回窗口内，并依据相对位移给动量，让它在窗口内反弹
+  useEffect(() => {
+    posRef.current = pos
+  }, [pos])
+  useEffect(() => {
+    const onResize = () => {
+      const nw = window.innerWidth
+      const nh = window.innerHeight
+      const prev = posRef.current
+      const nx = Math.max(0, Math.min(prev.x, nw - WIDGET_W - 8))
+      const ny = Math.max(0, Math.min(prev.y, nh - WIDGET_H - 8))
+      const dx = prev.x - nx
+      const dy = prev.y - ny
+      setPos({ x: nx, y: ny })
+      if (Math.hypot(dx, dy) > 6) {
+        setFlinging(true)
+        let bounced = false
+        flingRef.current = startFling({
+          x: nx,
+          y: ny,
+          vx: dx * 5,
+          vy: dy * 5,
+          width: WIDGET_W,
+          height: WIDGET_H,
+          onMove: (x, y) => setPos({ x, y }),
+          onBounce: (axis) => {
+            bounced = true
+            reportEvent('bounce', { axis })
+            reportEvent('sound', { kind: 'bounce' })
+            soundRef.current?.bounce()
+            shake()
+            setBounceAxis(axis)
+            window.clearTimeout(bounceTimerRef.current)
+            bounceTimerRef.current = window.setTimeout(() => setBounceAxis(null), 260)
+          },
+          onDone: (x, y) => {
+            flingRef.current = null
+            setFlinging(false)
+            // 未撞边（低速）也播一次弹跳完成音
+            if (!bounced) soundRef.current?.bounce()
+            snap(x, y)
+          }
+        })
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [reportEvent, shake, snap])
 
   return (
     <>

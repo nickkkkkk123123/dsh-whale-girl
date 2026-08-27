@@ -54,7 +54,7 @@ export interface FlingOptions {
   onDone?: (x: number, y: number) => void
 }
 
-const STOP_SPEED = 70
+const STOP_SPEED = 34
 const FRICTION_PER_FRAME = 0.985
 const MAX_DT = 0.05
 
