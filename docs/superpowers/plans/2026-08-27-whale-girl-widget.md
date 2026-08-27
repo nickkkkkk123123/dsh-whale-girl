@@ -1027,18 +1027,21 @@ git commit -m "feat: sound engine with duck and cute modes"
 
 Run: `pnpm test && pnpm typecheck && pnpm build`
 Expected: 全绿，`lib/index.js` + `lib/client.js` + `assets/` 完整
+Actual: ✅ 全绿（exit 0）；`lib/client.js`/`lib/index.js`（含 map）已生成
 
-- [ ] **Step 2: 安装到 desktop profile**
+- [x] **Step 2: 安装到 desktop profile**
 
 Run: `dsh plugin --profile desktop add link:D:\dsh-whale-girl`
 Expected: 安装成功，`desktop/package.json` bundles 出现 `dsh-whale-girl`
+Actual: ✅ 已安装；`C:\Users\NICK\.dsh\profiles\desktop\package.json` dependencies 含 `dsh-whale-girl: link:D:/dsh-whale-girl`；`dsh plugin --profile desktop list` 可见
 
-- [ ] **Step 3: 验证配置**
+- [x] **Step 3: 验证配置**
 
 Run: `dsh --profile desktop --dump-config | grep whale-girl`
 Expected: `whale-girl` 条目存在
+Actual: ✅ CONFIG_HAS_WHALE_GIRL；assets（whale-girl.png 1.1MB / Ya1.mp3 / Ya2.mp3）在位
 
-- [ ] **Step 4: 重启 DSH Desktop 并人工验证**
+- [ ] **Step 4: 重启 DSH Desktop 并人工验证（待用户执行：重启 + F5）**
 
 Run: 重启 DSH Desktop，F5 刷新
 Expected:
@@ -1145,17 +1148,19 @@ const cancelRef = useRef<(() => void) | null>(null)
 // 表情：bounce 时 img 短暂 scale 抖动（CSS class 切换）
 ```
 
-- [ ] **Step 4: `pnpm typecheck && pnpm build && pnpm test`**
+- [x] **Step 4: `pnpm typecheck && pnpm build && pnpm test`**
 
 Run: `pnpm typecheck && pnpm build && pnpm test`
 Expected: 全绿
+Actual: ✅ 全绿（exit 0）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/client/
 git commit -m "feat: fling bounce physics for whale widget"
 ```
+Actual: ✅ `2d16cbf`（实现）+ `743d411`（docs：勾选 Steps 1-3）
 
 ---
 
