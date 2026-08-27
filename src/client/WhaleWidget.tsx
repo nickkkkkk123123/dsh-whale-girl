@@ -4,6 +4,7 @@ import { ContextBar, WhaleState } from './ContextBar'
 import { Bubble } from './Bubble'
 import { EasterEgg } from './EasterEgg'
 import { pickRandomIdleLine } from './quotes'
+import { SoundEngine } from './SoundEngine'
 
 // DSH 运行时 Builtin（Client 侧），Package-private RPC 到宿主
 declare const host: {
@@ -32,6 +33,8 @@ export function WhaleWidget() {
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
   const pressStartRef = useRef<{ x: number; y: number } | null>(null)
   const eggRef = useRef(new EasterEgg())
+  const soundRef = useRef<SoundEngine | null>(null)
+  if (soundRef.current === null) soundRef.current = new SoundEngine()
 
   // 数据轮询（60s）
   useEffect(() => {
@@ -67,6 +70,7 @@ export function WhaleWidget() {
     dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
     pressStartRef.current = { x: e.clientX, y: e.clientY }
     setPressed(true)
+    soundRef.current?.press()
     try {
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     } catch {
@@ -89,6 +93,7 @@ export function WhaleWidget() {
     dragRef.current = null
     pressStartRef.current = null
     setPressed(false)
+    soundRef.current?.release()
     // 点击（非拖拽）：触发彩蛋/随机台词
     if (!moved) {
       const r = eggRef.current.onPress()
