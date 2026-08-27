@@ -22,6 +22,9 @@ export default defineConfig([
     sourcemap: true,
     clean: false,
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+    deps: {
+      neverBundle: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client']
+    },
     outputOptions: {
       entryFileNames: 'client.js',
       banner: 'window.__ModuleLoader__.load({ id: "dsh-whale-girl", factory: (require) => {',

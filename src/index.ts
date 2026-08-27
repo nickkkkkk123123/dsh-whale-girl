@@ -4,6 +4,7 @@ import { estimateCost } from './services/turnCost'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const name = 'dsh-whale-girl'
 
@@ -15,8 +16,37 @@ declare const harness: {
 const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 const USAGE_FILE = path.join(DSH_HOME, '.whale-girl-usage.json')
 const CONFIG_FILE = path.join(DSH_HOME, '.whale-girl-config.json')
+const ASSET_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../assets')
+
+// 静态资源：图片 + 音效（给客户端挂件用，带缓存头）
+function registerAssetRoutes(ctx: any): void {
+  const webServer = ctx.get('webServer')
+  if (!webServer) return
+  for (const f of ['whale-girl.png', 'Ya1.mp3', 'Ya2.mp3']) {
+    webServer.register({
+      kind: 'exact',
+      path: `/dsh-whale-girl/${f}`,
+      handler: (req: unknown, res: any) => {
+        try {
+          const buf = fs.readFileSync(path.join(ASSET_ROOT, f))
+          res.writeHead(200, {
+            'Content-Type': f.endsWith('.mp3') ? 'audio/mpeg' : 'image/png',
+            'Cache-Control': 'public, max-age=86400, immutable',
+            'Content-Length': String(buf.length)
+          })
+          res.end(buf)
+        } catch {
+          res.writeHead(404)
+          res.end()
+        }
+      }
+    })
+  }
+}
 
 export function apply(ctx: any) {
+  registerAssetRoutes(ctx)
+
   const ledger = new Ledger()
   try {
     ledger.load(fs.readFileSync(USAGE_FILE, 'utf8'))

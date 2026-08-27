@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@esbuild/win32-x64": "0.28.2",
+    "@tsdown/css": "^0.22.14",
     "@types/node": "^24.0.0",
     "@types/react": "^18.3.0",
     "esbuild": "^0.28.2",
