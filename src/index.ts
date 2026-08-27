@@ -7,11 +7,55 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const name = 'dsh-whale-girl'
+export const inject = ['webServer', 'credentials', 'timer', 'tokenMeter', 'sessions', 'agents']
 
 const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 const USAGE_FILE = path.join(DSH_HOME, '.whale-girl-usage.json')
 const CONFIG_FILE = path.join(DSH_HOME, '.whale-girl-config.json')
+const DIAG_FILE = path.join(DSH_HOME, '.whale-girl-diag.log')
 const ASSET_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../assets')
+
+/** 诊断记录（排查 client 数据是否到达、host 数据是否就绪）。用完可删除该日志文件。 */
+function diag(line: string): void {
+  try {
+    fs.appendFileSync(DIAG_FILE, `[${new Date().toISOString()}] ${line}\n`)
+  } catch {
+    // ignore
+  }
+}
+
+// 挂件配置默认值（也是"自定义接口"的字段说明：直接编辑 ~/.dsh/.whale-girl-config.json 即可自定义显示组合）
+export interface WidgetConfig {
+  /** 音效：'cute' 可爱合成音 / 'duck' 鸭叫（需要 mp3，可能被 webserver 403 拦截时无声） */
+  soundMode: 'cute' | 'duck'
+  /** 是否显示底部上下文进度条 */
+  showProgress: boolean
+  /** 是否显示彩蛋/随机台词气泡 */
+  showBubble: boolean
+  /** 是否在进度条详情里显示余额 */
+  showBalance: boolean
+  /** 是否在进度条详情里显示峰谷提醒 */
+  showPeak: boolean
+}
+
+const DEFAULT_CONFIG: WidgetConfig = {
+  soundMode: 'cute',
+  showProgress: true,
+  showBubble: true,
+  showBalance: true,
+  showPeak: true
+}
+
+function normalizeConfig(raw: unknown): WidgetConfig {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  return {
+    soundMode: o.soundMode === 'duck' ? 'duck' : 'cute',
+    showProgress: o.showProgress !== false,
+    showBubble: o.showBubble !== false,
+    showBalance: o.showBalance !== false,
+    showPeak: o.showPeak !== false
+  }
+}
 
 // 静态资源：图片 + 音效（给客户端挂件用，带缓存头）
 function registerAssetRoutes(ctx: any): void {
@@ -40,6 +84,7 @@ function registerAssetRoutes(ctx: any): void {
 }
 
 export function apply(ctx: any) {
+  diag('apply-ok')
   registerAssetRoutes(ctx)
 
   const ledger = new Ledger()
@@ -49,27 +94,71 @@ export function apply(ctx: any) {
     // first run
   }
 
+  // 挂件配置（读取/写入 CONFIG_FILE；client 通过 api/config GET/POST 读写）
+  let widgetConfig: WidgetConfig = DEFAULT_CONFIG
+  try {
+    const raw = fs.readFileSync(CONFIG_FILE, 'utf8')
+    widgetConfig = normalizeConfig(JSON.parse(raw))
+  } catch {
+    // use defaults on first run / malformed config
+  }
+
   let cachedBalance: number | null = null
   let cachedCurrency = 'CNY'
   let lastTurnCost: number | null = null
+  // 当前活跃会话（turn-stopping 时记录；ctx.sessions.list()[0] 不稳定）
+  let currentSession: any = null
+  // 缓存最近一次成功获取的会话，避免 buildState 轮询时会话引用短暂丢失导致上下文闪 0
+  let lastKnownSession: any = null
+
+  // 峰谷时段：按小时记录"本轮对话消耗 token"，用于判断当前时段是高峰还是低谷
+  const hourlyUsage: Record<number, number> = {}
+
+  /** 当前时段峰谷判断：'high' / 'low' / null（无足够数据）。 */
+  function computePeak(hour: number): 'high' | 'low' | null {
+    const hours = Object.entries(hourlyUsage)
+      .map(([h, v]) => ({ h: Number(h), v }))
+      .filter((e) => e.v > 0)
+    if (hours.length < 2) return null
+    const sum = hours.reduce((a, e) => a + e.v, 0)
+    const mean = sum / hours.length
+    const cur = hourlyUsage[hour] ?? 0
+    if (cur >= mean * 1.3) return 'high'
+    if (cur > 0 && cur <= mean * 0.7) return 'low'
+    return null
+  }
 
   async function refreshBalance(): Promise<void> {
     try {
-      const creds = ctx.get('credentials')
-      if (!creds) return
-      const ref = await creds.resolve({ key: 'DEEPSEEK_API_KEY' })
-      const key = typeof ref === 'string' ? ref : ref?.value
-      if (!key) return
+      const creds = ctx.credentials ?? ctx.get('credentials')
+      if (!creds) {
+        diag('refresh: no-credentials')
+        return
+      }
+      let ref: unknown
+      try {
+        ref = await creds.resolve('DEEPSEEK_API_KEY')
+      } catch (e: any) {
+        diag(`refresh: resolve-err ${e?.message ?? String(e)}`)
+        return
+      }
+      const key = typeof ref === 'string' ? ref : ref && typeof ref === 'object' ? (ref as any).value : undefined
+      if (!key) {
+        diag('refresh: no-key')
+        return
+      }
       const { totalBalance, currency } = await fetchBalance(key)
       cachedBalance = totalBalance
       cachedCurrency = currency
       ledger.observe(totalBalance)
+      diag(`refresh-ok balance=${totalBalance} currency=${currency}`)
       try {
         fs.writeFileSync(USAGE_FILE, JSON.stringify(ledger.state))
       } catch {
         // storage not writable
       }
-    } catch {
+    } catch (err: any) {
+      diag(`refresh-fail ${err?.message ?? String(err)}`)
       // keep last values
     }
   }
@@ -81,7 +170,12 @@ export function apply(ctx: any) {
     timer.interval(refreshBalance, 60000)
   }
 
-  // 每轮消耗：turn 即将结束时用 tokenMeter 测当前会话 token，估算本轮成本
+  // 事件流：任意会话事件都更新当前活跃会话引用（whale-widget 同款方式，重启后会话恢复也能拿到）
+  ctx.on('session/event', (session: any) => {
+    if (session) currentSession = session
+  })
+
+  // 每轮消耗：turn 即将结束时用 tokenMeter 测当前会话 token，估算本轮成本 + 记入当前小时桶
   ctx.on('agent/turn-stopping', (payload: any) => {
     try {
       const agent = payload?.agent
@@ -89,12 +183,15 @@ export function apply(ctx: any) {
         agent?.session ??
         (agent?.sessionId ? ctx.sessions?.get?.(agent.sessionId) : undefined)
       if (!session) return
-      const tm = ctx.get('tokenMeter')
+      currentSession = session
+      const tm = ctx.tokenMeter ?? ctx.get('tokenMeter')
       if (!tm) return
       const m = tm.measure(session)
       const total = Number(m?.totalTokens ?? m?.tokens ?? m?.total ?? 0)
       if (total > 0) {
         lastTurnCost = estimateCost(total, { input: 0.5, output: 2, inputTokens: total, outputTokens: 0 })
+        const h = new Date().getHours()
+        hourlyUsage[h] = (hourlyUsage[h] ?? 0) + total
       }
     } catch {
       // ignore measurement errors
@@ -105,15 +202,35 @@ export function apply(ctx: any) {
   function buildState(): object {
     let contextTokens = 0
     try {
-      const tm = ctx.get('tokenMeter')
-      const session = ctx.sessions?.list?.()[0] ?? ctx.sessions?.get?.()
+      const tm = ctx.tokenMeter ?? ctx.get('tokenMeter')
+      const agent = ctx.agents?.roots?.()[0] ?? ctx.agents?.list?.()[0]
+      const session =
+        currentSession ??
+        lastKnownSession ??
+        agent?.session ??
+        ctx.sessions?.list?.()[0] ??
+        ctx.sessions?.get?.()
+      if (session) lastKnownSession = session
       if (tm && session) {
         const m = tm.measure(session)
-        contextTokens = Number(m?.totalTokens ?? m?.tokens ?? m?.total ?? 0)
+        try {
+          diag(`measure-keys: ${Object.keys(m).join(',')}`)
+          diag(`measure: ${JSON.stringify(m).slice(0, 800)}`)
+        } catch (e: any) {
+          diag(`measure-err: ${String(e)}`)
+        }
+        // surfaceTokens = 会话表面稳定占用（对话结束不清零）；totalTokens = 请求压力（对话结束归 0）
+        contextTokens = Number(m?.surfaceTokens ?? m?.totalTokens ?? m?.tokens ?? m?.total ?? 0)
+      } else {
+        diag(`measure: tm=${!!tm} session=${!!session}`)
       }
     } catch {
       // ignore
     }
+    const peak = computePeak(new Date().getHours())
+    diag(
+      `state: ctxTokens=${contextTokens} balance=${cachedBalance} currency=${cachedCurrency} todayUsage=${ledger.state.todayUsage} lastTurnCost=${lastTurnCost}`
+    )
     return {
       balance: cachedBalance,
       currency: cachedCurrency,
@@ -121,7 +238,8 @@ export function apply(ctx: any) {
       contextPct: computeContextPct(contextTokens, DEFAULT_CONTEXT_LIMIT),
       contextTokens,
       contextLimit: DEFAULT_CONTEXT_LIMIT,
-      lastTurnCost
+      lastTurnCost,
+      peakLow: peak
     }
   }
 
@@ -130,6 +248,7 @@ export function apply(ctx: any) {
       kind: 'exact',
       path: '/dsh-whale-girl/api/state',
       handler: (req: unknown, res: any) => {
+        diag('state-hit')
         res.writeHead(200, {
           'Content-Type': 'application/json; charset=utf-8',
           'Cache-Control': 'no-store'
@@ -137,27 +256,85 @@ export function apply(ctx: any) {
         res.end(JSON.stringify(buildState()))
       }
     })
+    // JSONP 端点：client 用动态 <script> 加载（script 资源请求与 client.js 同通道，可透过 webserver 认证；普通 fetch 会被 403 拦）
+    server.register({
+      kind: 'exact',
+      path: '/dsh-whale-girl/api/state.js',
+      handler: (req: unknown, res: any) => {
+        diag('state-jsonp-hit')
+        res.writeHead(200, {
+          'Content-Type': 'text/javascript; charset=utf-8',
+          'Cache-Control': 'no-store'
+        })
+        res.end(`window.__wgState=${JSON.stringify(buildState())};`)
+      }
+    })
+    // GET：返回挂件配置；POST：保存挂件配置
     server.register({
       kind: 'exact',
       path: '/dsh-whale-girl/api/config',
       handler: (req: any, res: any) => {
-        let body = ''
-        req.on('data', (c: Buffer) => {
-          body += String(c)
+        const method = (req.method ?? 'GET').toUpperCase()
+        if (method === 'POST' || method === 'PUT') {
+          let body = ''
+          req.on('data', (c: Buffer) => {
+            body += String(c)
+          })
+          req.on('end', () => {
+            try {
+              const parsed = JSON.parse(body)
+              widgetConfig = normalizeConfig(parsed)
+              fs.writeFileSync(CONFIG_FILE, JSON.stringify(widgetConfig, null, 2))
+            } catch {
+              // keep current on malformed body
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+            res.end(JSON.stringify({ ok: true, config: widgetConfig }))
+          })
+          return
+        }
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
         })
-        req.on('end', () => {
-          try {
-            fs.writeFileSync(CONFIG_FILE, body)
-          } catch {
-            // ignore
-          }
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-          res.end('{"ok":true}')
-        })
+        res.end(JSON.stringify(widgetConfig))
       }
     })
   }
 
   const apiServer = ctx.get('webServer')
-  if (apiServer) registerApiRoutes(apiServer)
+  if (apiServer) {
+    registerApiRoutes(apiServer)
+    // 数据桥：把桥接脚本注入主页面顶层（主页面 fetch 带认证，能拿数据），脚本定期拉取并 postMessage 广播给 slots 挂件。
+    // slots 组件运行在 iframe/隔离上下文，其自身 fetch 不带认证会被 webserver 403 拦。
+    const BRIDGE_JS = `(function () {
+  if (window.__wgBridge) return
+  window.__wgBridge = true
+  var pull = function () {
+    try {
+      fetch('/dsh-whale-girl/api/state', { cache: 'no-store' })
+        .then(function (r) { return r.json() })
+        .then(function (d) {
+          if (d && typeof d === 'object') {
+            window.__wgData = d
+            window.postMessage({ __wgData: d }, '*')
+          }
+        })
+        .catch(function () {})
+    } catch (e) {}
+  }
+  pull()
+  setInterval(pull, 60000)
+})()`
+    // 用 index-inject 事件注入桥接脚本（DSH Desktop 页面经 collectIndexInjections 生成，tapIndex 不生效）
+    ctx.on('webserver/index-inject', (table: any[]) => {
+      const has = Array.isArray(table) && table.some(
+        (row) => row && typeof row === 'object' && typeof row.text === 'string' && row.text.indexOf('__wgBridge') !== -1
+      )
+      if (!has) {
+        diag('index-inject-called')
+        table.push({ kind: 'script', placement: 'head', text: BRIDGE_JS })
+      }
+    })
+  }
 }
