@@ -1055,6 +1055,110 @@ Run: 确认无报错后，`git commit -am "chore: verified end-to-end"`
 
 ---
 
+### Task 11: 甩抛弹跳物理模块
+
+**Files:**
+- Create: `src/client/PhysicsFling.ts`
+- Modify: `src/client/WhaleWidget.tsx`（接入速度检测 + 弹跳循环）
+
+**Interfaces:**
+- Consumes: `WhaleWidget` 的 `pos`/`setPos` 与 pointer 事件
+- Produces: `FlingTracker` 类（`record(x, y, t)` 采样、`velocity(): {vx, vy}` 计算）；`runFling(vx, vy, bounds, onBounce, onDone)` 弹跳循环
+
+- [x] **Step 1: 实现 `PhysicsFling.ts`（速度跟踪 + 弹跳循环）**（落地：`FlingTracker.push/velocity/clear` + `startFling` 返回 `{ cancel }`；撞边回调 `onBounce('x'|'y')`）
+
+```ts
+export class FlingTracker {
+  private samples: { x: number; y: number; t: number }[] = []
+  record(x: number, y: number, t: number = performance.now()): void {
+    this.samples.push({ x, y, t })
+    if (this.samples.length > 6) this.samples.shift()
+  }
+  velocity(): { vx: number; vy: number } {
+    if (this.samples.length < 2) return { vx: 0, vy: 0 }
+    const a = this.samples[0]
+    const b = this.samples[this.samples.length - 1]
+    const dt = Math.max(1, b.t - a.t) / 1000
+    return { vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt }
+  }
+  reset(): void { this.samples = [] }
+}
+
+export function runFling(
+  startX: number,
+  startY: number,
+  vx: number,
+  vy: number,
+  bounds: { w: number; h: number },
+  onUpdate: (x: number, y: number) => void,
+  onBounce: () => void,
+  onDone: (x: number, y: number) => void
+): () => void {
+  let x = startX
+  let y = startY
+  let vx0 = vx
+  let vy0 = vy
+  let raf = 0
+  let last = performance.now()
+  const W = Math.max(1, bounds.w - 170)
+  const H = Math.max(1, bounds.h - 180)
+  const step = (now: number) => {
+    const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000))
+    last = now
+    x += vx0 * dt
+    y += vy0 * dt
+    let bounced = false
+    if (x < 0) { x = 0; vx0 = Math.abs(vx0) * 0.85; bounced = true }
+    else if (x > W) { x = W; vx0 = -Math.abs(vx0) * 0.85; bounced = true }
+    if (y < 0) { y = 0; vy0 = Math.abs(vy0) * 0.85; bounced = true }
+    else if (y > H) { y = H; vy0 = -Math.abs(vy0) * 0.85; bounced = true }
+    if (bounced) onBounce()
+    onUpdate(x, y)
+    vx0 *= 0.98
+    vy0 *= 0.98
+    if (Math.abs(vx0) < 20 && Math.abs(vy0) < 20) {
+      onDone(x, y)
+      return
+    }
+    raf = requestAnimationFrame(step)
+  }
+  raf = requestAnimationFrame(step)
+  return () => cancelAnimationFrame(raf)
+}
+```
+
+- [x] **Step 2: 接入 WhaleWidget（pointer 记录采样，松手超阈值触发弹跳，否则吸附）**（阈值 1200 px/s；弹跳中停用 transition，松手重新按下即取消）
+
+```tsx
+const flingRef = useRef(new FlingTracker())
+const cancelRef = useRef<(() => void) | null>(null)
+// onPointerDown: cancelRef.current?.(); flingRef.current.reset(); 开始采样
+// onPointerMove（拖拽中）: flingRef.current.record(e.clientX, e.clientY)
+// onPointerUp: 计算 velocity；若 |v| > 600 → runFling(...)（弹跳，onBounce 播放音效+表情）；否则原吸附逻辑
+// 注意：弹跳模式下 onPointerUp 不再立即吸附，由 onDone 时吸附
+```
+
+- [x] **Step 3: 撞边音效/表情（onBounce 里 sound 播放 + 短促表情）**（落地：`SoundEngine.bounce()`（duck 复用 Ya2 / cute 短波音）+ `wg-bounce`/`wg-shake` CSS，抖动 300ms）
+
+```tsx
+// onBounce: soundRef.current?.bounce?.()（SoundEngine 增加 bounce() 方法：cute 高频短音）
+// 表情：bounce 时 img 短暂 scale 抖动（CSS class 切换）
+```
+
+- [ ] **Step 4: `pnpm typecheck && pnpm build && pnpm test`**
+
+Run: `pnpm typecheck && pnpm build && pnpm test`
+Expected: 全绿
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/client/
+git commit -m "feat: fling bounce physics for whale widget"
+```
+
+---
+
 ## Self-Review
 
 **1. Spec coverage:**
