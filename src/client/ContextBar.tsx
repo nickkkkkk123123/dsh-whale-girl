@@ -70,8 +70,8 @@ export function ContextBar({
             <div className="wg-context-row">当前余额 <strong>{balance === null ? '不可用' : `${currency} ¥${balance.toFixed(2)}`}</strong></div>
           )}
           {showBalance && todayUsage > 0 && <div className="wg-context-row">今日用量 <strong>¥{todayUsage.toFixed(2)}</strong></div>}
-          {showPeak && peakLow === 'high' && <div className="wg-badge wg-badge-high">🔺 当前用量高峰</div>}
-          {showPeak && peakLow === 'low' && <div className="wg-badge wg-badge-low">🔻 当前用量低谷</div>}
+          {showPeak && peakLow === 'high' && <div className="wg-badge wg-badge-high">🔺 高峰时段</div>}
+          {showPeak && peakLow === 'low' && <div className="wg-badge wg-badge-low">🔻 空闲时段</div>}
           {p >= 80 && <div className="wg-warn">⚠️ 快满啦，建议开新会话</div>}
         </div>
       )}

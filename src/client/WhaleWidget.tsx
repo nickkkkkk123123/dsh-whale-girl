@@ -7,6 +7,7 @@ import { pickRandomIdleLine } from './quotes'
 import { SoundEngine } from './SoundEngine'
 import { FlingTracker, startFling } from './PhysicsFling'
 import { WHALE_GIRL_DATA_URL } from './whaleDataUrl'
+import { RUA_GIF_URL } from './ruaDataUrl'
 import { WidgetMenu, MenuConfig, DEFAULT_MENU_CONFIG } from './WidgetMenu'
 
 const EMPTY_STATE: WhaleState = {
@@ -59,6 +60,9 @@ export function WhaleWidget() {
   const [dragging, setDragging] = useState(false)
   const [flinging, setFlinging] = useState(false)
   const [bounce, setBounce] = useState(false)
+  const [bounceAxis, setBounceAxis] = useState<'x' | 'y' | null>(null)
+  const [petted, setPetted] = useState(false)
+  const [petKey, setPetKey] = useState(0)
   const [state, setState] = useState<WhaleState>(EMPTY_STATE)
   const [bubble, setBubble] = useState<string | null>(null)
   const [imgSrc] = useState<string>(WHALE_GIRL_DATA_URL)
@@ -69,6 +73,7 @@ export function WhaleWidget() {
   const trackerRef = useRef(new FlingTracker())
   const flingRef = useRef<{ cancel: () => void } | null>(null)
   const bounceTimerRef = useRef(0)
+  const petTimerRef = useRef(0)
   const eggRef = useRef(new EasterEgg())
   const soundRef = useRef<SoundEngine | null>(null)
   if (soundRef.current === null) soundRef.current = new SoundEngine()
@@ -145,6 +150,7 @@ export function WhaleWidget() {
   useEffect(() => {
     return () => {
       window.clearTimeout(bounceTimerRef.current)
+      window.clearTimeout(petTimerRef.current)
       flingRef.current?.cancel()
     }
   }, [])
@@ -186,6 +192,15 @@ export function WhaleWidget() {
     setPos({ x: Math.max(8, left), y: top })
   }, [])
 
+  // 交互诊断上报：通过 postMessage 发给页面顶层 bridge，由 bridge 用带认证的 fetch 上报宿主写日志
+  const reportEvent = useCallback((type: string, extra?: Record<string, unknown>) => {
+    try {
+      window.postMessage({ __wgEvent: { type, ...extra, t: Date.now() } }, '*')
+    } catch {
+      // ignore
+    }
+  }, [])
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       const el = rootRef.current
@@ -199,13 +214,14 @@ export function WhaleWidget() {
       setDragging(true)
       soundRef.current?.unlock()
       soundRef.current?.press()
+      reportEvent('sound', { kind: 'press' })
       try {
         ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
       } catch {
         // ignore
       }
     },
-    [stopFling]
+    [stopFling, reportEvent]
   )
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
@@ -228,14 +244,21 @@ export function WhaleWidget() {
       setPressed(false)
       setDragging(false)
       soundRef.current?.release()
+      reportEvent('sound', { kind: 'release' })
 
       // 点击（非拖拽）：触发彩蛋/随机台词（仅当气泡模块开启）
       if (!moved) {
+        reportEvent('click')
+        setPetted(true)
+        setPetKey((k) => k + 1)
+        window.clearTimeout(petTimerRef.current)
+        petTimerRef.current = window.setTimeout(() => setPetted(false), 260)
         if (config.showBubble) {
           const r = eggRef.current.onPress()
           setBubble(r.kind === 'quote' ? r.text : pickRandomIdleLine())
         }
       } else if (vel && Math.hypot(vel.vx, vel.vy) >= FLING_SPEED) {
+        reportEvent('fling', { vx: vel.vx, vy: vel.vy })
         // 快速甩抛：进入弹跳模式
         const el = rootRef.current
         if (el) {
@@ -249,9 +272,14 @@ export function WhaleWidget() {
             width: WIDGET_W,
             height: WIDGET_H,
             onMove: (x, y) => setPos({ x, y }),
-            onBounce: () => {
+            onBounce: (axis) => {
+              reportEvent('bounce', { axis })
+              reportEvent('sound', { kind: 'bounce' })
               soundRef.current?.bounce()
               shake()
+              setBounceAxis(axis)
+              window.clearTimeout(bounceTimerRef.current)
+              bounceTimerRef.current = window.setTimeout(() => setBounceAxis(null), 260)
             },
             onDone: (x, y) => {
               flingRef.current = null
@@ -275,7 +303,7 @@ export function WhaleWidget() {
         // ignore
       }
     },
-    [shake, snap, config.showBubble]
+    [shake, snap, config.showBubble, reportEvent]
   )
 
   return (
@@ -283,8 +311,8 @@ export function WhaleWidget() {
       <style>{WIDGET_CSS}</style>
       <div
         ref={rootRef}
-        className={`wg-root${dragging ? ' wg-dragging' : ''}${flinging ? ' wg-flinging' : ''}${bounce ? ' wg-bounce' : ''}`}
-        style={{ left: pos.x, top: pos.y, transform: pressed ? 'scale(0.9)' : undefined }}
+        className={`wg-root${dragging ? ' wg-dragging' : ''}${flinging ? ' wg-flinging' : ''}${bounce ? ' wg-bounce' : ''}${bounceAxis === 'x' ? ' wg-squash-x' : ''}${bounceAxis === 'y' ? ' wg-squash-y' : ''}${petted ? ' wg-pet' : ''}${pos.x + WIDGET_W / 2 < window.innerWidth / 2 ? ' wg-flip' : ''}`}
+        style={{ left: pos.x, top: pos.y, transform: pressed ? 'scaleY(0.9)' : undefined }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -292,6 +320,11 @@ export function WhaleWidget() {
         data-pressed={pressed}
       >
         <img className="wg-img" src={imgSrc || '/dsh-whale-girl/whale-girl.png'} alt="鲸鱼娘" draggable={false} />
+        {petted && (
+          <div className="wg-rua" key={petKey}>
+            <img src={RUA_GIF_URL} alt="" draggable={false} />
+          </div>
+        )}
         {config.showProgress && (
           <ContextBar
             pct={state.contextPct}
@@ -307,7 +340,11 @@ export function WhaleWidget() {
           />
         )}
         {config.showBubble && bubble && (
-          <Bubble text={bubble} onClose={() => setBubble(null)} rootRef={rootRef} />
+          <Bubble
+            text={bubble}
+            onClose={() => setBubble(null)}
+            flip={pos.x + WIDGET_W / 2 < window.innerWidth / 2}
+          />
         )}
       </div>
       {menu && (

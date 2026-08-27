@@ -9,6 +9,7 @@ export class SoundEngine {
   private duckPress: HTMLAudioElement | null = null
   private duckRelease: HTMLAudioElement | null = null
   private actx: AudioContext | null = null
+  private bounceBuf: AudioBuffer | null = null
 
   constructor() {
     if (typeof window === 'undefined') return
@@ -75,7 +76,36 @@ export class SoundEngine {
       this.play(this.duckRelease)
       return
     }
-    this.cute(340, 0.14, 'triangle', 0.22)
+    const ctx = this.actx
+    if (!ctx) return
+    const doPlay = () => {
+      try {
+        // 预生成一次短促"boing"音采样，之后每次用 BufferSource 播放（比反复新建振荡器更省资源、更稳，避免多次弹跳后声音消失）
+        if (!this.bounceBuf) {
+          const sr = ctx.sampleRate
+          const len = Math.floor(sr * 0.15)
+          const buf = ctx.createBuffer(1, len, sr)
+          const data = buf.getChannelData(0)
+          for (let i = 0; i < len; i++) {
+            const t = i / len
+            const f = 420 * Math.pow(0.55, t)
+            data[i] = Math.sin(2 * Math.PI * f * (i / sr)) * (1 - t) * 0.24
+          }
+          this.bounceBuf = buf
+        }
+        const src = ctx.createBufferSource()
+        src.buffer = this.bounceBuf
+        src.connect(ctx.destination)
+        src.start()
+      } catch {
+        // ignore
+      }
+    }
+    if (ctx.state === 'suspended') {
+      void ctx.resume().then(doPlay).catch(() => {})
+    } else {
+      doPlay()
+    }
   }
 
   private play(a: HTMLAudioElement | null) {
@@ -93,22 +123,29 @@ export class SoundEngine {
   private cute(freq: number, dur: number, type: OscillatorType, gain: number) {
     const ctx = this.actx
     if (!ctx) return
-    try {
-      if (ctx.state === 'suspended') void ctx.resume()
-      const t = ctx.currentTime
-      const osc = ctx.createOscillator()
-      const g = ctx.createGain()
-      osc.type = type
-      osc.frequency.setValueAtTime(freq * 0.6, t)
-      osc.frequency.exponentialRampToValueAtTime(freq, t + 0.04)
-      g.gain.setValueAtTime(gain, t)
-      g.gain.exponentialRampToValueAtTime(0.001, t + dur)
-      osc.connect(g)
-      g.connect(ctx.destination)
-      osc.start(t)
-      osc.stop(t + dur + 0.02)
-    } catch {
-      // ignore
+    const doPlay = () => {
+      try {
+        const t = ctx.currentTime
+        const osc = ctx.createOscillator()
+        const g = ctx.createGain()
+        osc.type = type
+        osc.frequency.setValueAtTime(freq * 0.6, t)
+        osc.frequency.exponentialRampToValueAtTime(freq, t + 0.04)
+        g.gain.setValueAtTime(gain, t)
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur)
+        osc.connect(g)
+        g.connect(ctx.destination)
+        osc.start(t)
+        osc.stop(t + dur + 0.02)
+      } catch {
+        // ignore
+      }
+    }
+    // 若 AudioContext 处于 suspended（浏览器音频策略/空闲挂起），先 resume 完成再播放，避免连续音效丢声
+    if (ctx.state === 'suspended') {
+      void ctx.resume().then(doPlay).catch(() => {})
+    } else {
+      doPlay()
     }
   }
 }

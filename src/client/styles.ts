@@ -16,24 +16,39 @@ export const WIDGET_CSS = `
 .wg-dragging {
   transition: none;
 }
-.wg-bounce .wg-img {
-  animation: wg-shake 240ms ease-out;
+.wg-squash-x .wg-img {
+  animation: wg-squash-x 240ms ease-out;
 }
-@keyframes wg-shake {
-  0%, 100% { transform: rotate(0deg); }
-  20% { transform: rotate(-8deg); }
-  40% { transform: rotate(7deg); }
-  60% { transform: rotate(-5deg); }
-  80% { transform: rotate(3deg); }
+.wg-squash-y .wg-img {
+  animation: wg-squash-y 240ms ease-out;
+}
+@keyframes wg-squash-x {
+  0% { transform: scaleX(1.35) scaleY(0.7); }
+  60% { transform: scaleX(0.6) scaleY(1.35); }
+  100% { transform: scaleX(1) scaleY(1); }
+}
+@keyframes wg-squash-y {
+  0% { transform: scaleX(0.7) scaleY(1.35); }
+  60% { transform: scaleX(1.35) scaleY(0.6); }
+  100% { transform: scaleX(1) scaleY(1); }
 }
 .wg-root:active { cursor: grabbing; }
 .wg-img {
   width: 100%;
-  height: 100%;
+  height: 76%;
   object-fit: contain;
   pointer-events: none;
   animation: wg-float 3.4s ease-in-out infinite;
   filter: drop-shadow(0 4px 10px rgba(30, 50, 120, 0.18));
+}
+/* 角色吸附窗口左部时镜像翻转（面向右，贴合成窗沿），带平滑的 3D 翻转动画 */
+.wg-flip .wg-img {
+  animation: wg-flip-3d 420ms ease;
+  transform: scaleX(-1);
+}
+@keyframes wg-flip-3d {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(180deg); }
 }
 @keyframes wg-float {
   0%, 100% { transform: translateY(0); }
@@ -43,7 +58,7 @@ export const WIDGET_CSS = `
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: 2px;
+  bottom: 0;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(80, 110, 190, 0.25);
@@ -87,11 +102,19 @@ export const WIDGET_CSS = `
   transition: width 400ms ease, background 400ms ease;
 }
 .wg-context-detail {
-  margin-top: 6px;
-  padding: 2px 2px 4px;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(80, 110, 190, 0.25);
+  border-radius: 8px;
+  padding: 6px 8px;
   font-size: 12px;
   line-height: 1.55;
   color: #2a3a66;
+  box-shadow: 0 6px 18px rgba(30, 50, 120, 0.18);
+  z-index: 10001;
 }
 .wg-context-row {
   white-space: nowrap;
@@ -123,9 +146,11 @@ export const WIDGET_CSS = `
   margin-top: 5px;
 }
 .wg-bubble {
-  position: fixed;
+  position: absolute;
+  right: -4px;
+  bottom: 100%;
   width: max-content;
-  max-width: 360px;
+  max-width: 300px;
   background: rgba(255, 255, 255, 0.97);
   border: 1.5px solid rgba(74, 108, 247, 0.38);
   border-radius: 12px;
@@ -140,20 +165,58 @@ export const WIDGET_CSS = `
   animation: wg-pop 180ms ease-out;
   pointer-events: auto;
 }
+.wg-bubble-flip {
+  right: auto;
+  left: -4px;
+}
 .wg-bubble::after {
   content: '';
   position: absolute;
-  left: var(--arrow-x, 50%);
+  right: 14px;
   bottom: -7px;
-  transform: translateX(-50%);
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
   border-top: 8px solid rgba(74, 108, 247, 0.38);
 }
+.wg-bubble-flip::after {
+  right: auto;
+  left: 14px;
+}
 @keyframes wg-pop {
-  0% { transform: scale(0.85); opacity: 0; }
+  0% { transform: scale(0.9); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+.wg-rua {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 70px);
+  transform: translateX(-50%);
+  width: 88px;
+  height: 88px;
+  z-index: 10000;
+  pointer-events: none;
+}
+.wg-rua img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+/* 抚摸时角色明显上下压缩一次（立即，无漂浮抖动） */
+.wg-pet .wg-img {
+  animation: wg-pet-stretch 0.1s ease-in-out 1;
+}
+@keyframes wg-pet-stretch {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.85); }
+}
+@keyframes wg-rua-pat {
+  0% { transform: translateX(-50%) translateY(0); }
+  30% { transform: translateX(-50%) translateY(10px); }
+  60% { transform: translateX(-50%) translateY(-4px); }
+  100% { transform: translateX(-50%) translateY(0); }
+}
+
 .wg-menu {
   position: fixed;
   min-width: 190px;

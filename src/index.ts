@@ -111,21 +111,20 @@ export function apply(ctx: any) {
   // 缓存最近一次成功获取的会话，避免 buildState 轮询时会话引用短暂丢失导致上下文闪 0
   let lastKnownSession: any = null
 
-  // 峰谷时段：按小时记录"本轮对话消耗 token"，用于判断当前时段是高峰还是低谷
-  const hourlyUsage: Record<number, number> = {}
+  // DeepSeek 官方峰谷时段（北京时间）：工作日 9-12 点与 14-18 点为高峰，其余为低谷；周末全天低谷。
+  // 依据系统时间判断（与 dsh-whale-widget 的 isPeakTime 一致）。
+  function isPeakTime(timeSec: number): boolean {
+    if (!isFinite(timeSec)) return false
+    const bj = new Date(timeSec * 1000 + 8 * 3600 * 1000)
+    const dow = bj.getUTCDay() // 0=周日 6=周六（按北京时间读 UTC 即北京日历日）
+    if (dow === 0 || dow === 6) return false
+    const hour = bj.getUTCHours()
+    return (hour >= 9 && hour < 12) || (hour >= 14 && hour < 18)
+  }
 
-  /** 当前时段峰谷判断：'high' / 'low' / null（无足够数据）。 */
-  function computePeak(hour: number): 'high' | 'low' | null {
-    const hours = Object.entries(hourlyUsage)
-      .map(([h, v]) => ({ h: Number(h), v }))
-      .filter((e) => e.v > 0)
-    if (hours.length < 2) return null
-    const sum = hours.reduce((a, e) => a + e.v, 0)
-    const mean = sum / hours.length
-    const cur = hourlyUsage[hour] ?? 0
-    if (cur >= mean * 1.3) return 'high'
-    if (cur > 0 && cur <= mean * 0.7) return 'low'
-    return null
+  /** 当前时段峰谷：官方时段总是高峰或低谷。 */
+  function computePeak(now: Date): 'high' | 'low' {
+    return isPeakTime(Math.floor(now.getTime() / 1000)) ? 'high' : 'low'
   }
 
   async function refreshBalance(): Promise<void> {
@@ -190,8 +189,6 @@ export function apply(ctx: any) {
       const total = Number(m?.totalTokens ?? m?.tokens ?? m?.total ?? 0)
       if (total > 0) {
         lastTurnCost = estimateCost(total, { input: 0.5, output: 2, inputTokens: total, outputTokens: 0 })
-        const h = new Date().getHours()
-        hourlyUsage[h] = (hourlyUsage[h] ?? 0) + total
       }
     } catch {
       // ignore measurement errors
@@ -227,7 +224,8 @@ export function apply(ctx: any) {
     } catch {
       // ignore
     }
-    const peak = computePeak(new Date().getHours())
+    const peak = computePeak(new Date())
+    diag(`peak: ${peak}`)
     diag(
       `state: ctxTokens=${contextTokens} balance=${cachedBalance} currency=${cachedCurrency} todayUsage=${ledger.state.todayUsage} lastTurnCost=${lastTurnCost}`
     )
@@ -300,6 +298,22 @@ export function apply(ctx: any) {
         res.end(JSON.stringify(widgetConfig))
       }
     })
+    // 交互诊断回流：bridge 脚本收到挂件事件后上报，供宿主写诊断日志（我读日志即可确认弹跳/点击等交互发生）
+    server.register({
+      kind: 'exact',
+      path: '/dsh-whale-girl/api/diag-event',
+      handler: (req: any, res: any) => {
+        let body = ''
+        req.on('data', (c: Buffer) => {
+          body += String(c)
+        })
+        req.on('end', () => {
+          diag(`event: ${body.slice(0, 200)}`)
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+          res.end('{"ok":true}')
+        })
+      }
+    })
   }
 
   const apiServer = ctx.get('webServer')
@@ -325,6 +339,19 @@ export function apply(ctx: any) {
   }
   pull()
   setInterval(pull, 60000)
+  // 交互诊断回流：slots 挂件触发交互时 postMessage 事件，此处接收并上报宿主写日志
+  window.addEventListener('message', function (ev) {
+    var d = ev.data
+    if (d && d.__wgEvent) {
+      try {
+        fetch('/dsh-whale-girl/api/diag-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(d.__wgEvent)
+        }).catch(function () {})
+      } catch (err) {}
+    }
+  })
 })()`
     // 用 index-inject 事件注入桥接脚本（DSH Desktop 页面经 collectIndexInjections 生成，tapIndex 不生效）
     ctx.on('webserver/index-inject', (table: any[]) => {
