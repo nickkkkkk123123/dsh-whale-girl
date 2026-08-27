@@ -18,8 +18,8 @@
 ## 安装
 
 ```bash
-# 从 GitHub Release 安装（待发布）
-dsh plugin add dsh-whale-girl
+# 从 GitHub Release 安装（含 tgz 安装包，推荐）
+dsh plugin add nickkkkkk123123/dsh-whale-girl
 
 # 或本地源码目录 link 依赖后加入 profile bundles
 ```
