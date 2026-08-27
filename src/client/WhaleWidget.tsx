@@ -6,11 +6,6 @@ import { EasterEgg } from './EasterEgg'
 import { pickRandomIdleLine } from './quotes'
 import { SoundEngine } from './SoundEngine'
 
-// DSH 运行时 Builtin（Client 侧），Package-private RPC 到宿主
-declare const host: {
-  call(method: string, args?: unknown): Promise<unknown>
-}
-
 const EMPTY_STATE: WhaleState = {
   balance: null,
   currency: 'CNY',
@@ -36,17 +31,17 @@ export function WhaleWidget() {
   const soundRef = useRef<SoundEngine | null>(null)
   if (soundRef.current === null) soundRef.current = new SoundEngine()
 
-  // 数据轮询（60s）
+  // 数据轮询（60s）：通过宿主 webServer JSON 接口
   useEffect(() => {
     let alive = true
     const load = () => {
-      host
-        .call('whale.getState')
+      fetch('/dsh-whale-girl/api/state', { cache: 'no-store' })
+        .then((r) => r.json())
         .then((s) => {
           if (alive && s && typeof s === 'object') setState(s as WhaleState)
         })
         .catch(() => {
-          // host 未就绪
+          // 宿主接口未就绪
         })
     }
     load()

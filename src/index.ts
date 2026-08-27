@@ -8,11 +8,6 @@ import { fileURLToPath } from 'node:url'
 
 export const name = 'dsh-whale-girl'
 
-// DSH 运行时 Builtin（宿主环境提供），不在 TS 全局中
-declare const harness: {
-  handle(method: string, handler: (args: unknown) => unknown | Promise<unknown>): () => void
-}
-
 const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 const USAGE_FILE = path.join(DSH_HOME, '.whale-girl-usage.json')
 const CONFIG_FILE = path.join(DSH_HOME, '.whale-girl-config.json')
@@ -106,8 +101,8 @@ export function apply(ctx: any) {
     }
   })
 
-  // Package-private RPC：前端挂件轮询状态
-  harness.handle('whale.getState', async (): Promise<object> => {
+  // 数据接口：webServer JSON 路由（npm 编译插件用 webServer，不用 Builtin harness）
+  function buildState(): object {
     let contextTokens = 0
     try {
       const tm = ctx.get('tokenMeter')
@@ -128,15 +123,41 @@ export function apply(ctx: any) {
       contextLimit: DEFAULT_CONTEXT_LIMIT,
       lastTurnCost
     }
-  })
+  }
 
-  // 前端保存挂件配置（音效/大小/开关）
-  harness.handle('whale.setConfig', async (config: unknown): Promise<null> => {
-    try {
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify(config))
-    } catch {
-      // ignore
-    }
-    return null
-  })
+  function registerApiRoutes(server: any): void {
+    server.register({
+      kind: 'exact',
+      path: '/dsh-whale-girl/api/state',
+      handler: (req: unknown, res: any) => {
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        })
+        res.end(JSON.stringify(buildState()))
+      }
+    })
+    server.register({
+      kind: 'exact',
+      path: '/dsh-whale-girl/api/config',
+      handler: (req: any, res: any) => {
+        let body = ''
+        req.on('data', (c: Buffer) => {
+          body += String(c)
+        })
+        req.on('end', () => {
+          try {
+            fs.writeFileSync(CONFIG_FILE, body)
+          } catch {
+            // ignore
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+          res.end('{"ok":true}')
+        })
+      }
+    })
+  }
+
+  const apiServer = ctx.get('webServer')
+  if (apiServer) registerApiRoutes(apiServer)
 }
