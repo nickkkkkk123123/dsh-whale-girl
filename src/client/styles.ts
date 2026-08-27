@@ -42,17 +42,20 @@ export const WIDGET_CSS = `
   filter: drop-shadow(0 4px 10px rgba(30, 50, 120, 0.18));
 }
 /* 角色吸附窗口左部时镜像翻转（面向右，贴合成窗沿），带平滑的 3D 翻转动画 */
+.wg-flip {
+  --wg-flip: -1;
+}
 .wg-flip .wg-img {
-  animation: wg-flip-3d 420ms ease;
+  transform: scaleX(-1);
+  transition: transform 320ms ease;
+}
+/* 挂件翻转时，抚摸的手也镜像，从正确方向抚摸 */
+.wg-flip .wg-rua img {
   transform: scaleX(-1);
 }
-@keyframes wg-flip-3d {
-  0% { transform: rotateY(0deg); }
-  100% { transform: rotateY(180deg); }
-}
 @keyframes wg-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-9px); }
+  0%, 100% { transform: translateY(0) scaleX(var(--wg-flip, 1)); }
+  50% { transform: translateY(-9px) scaleX(var(--wg-flip, 1)); }
 }
 .wg-context {
   position: absolute;
@@ -207,8 +210,8 @@ export const WIDGET_CSS = `
   animation: wg-pet-stretch 0.1s ease-in-out 1;
 }
 @keyframes wg-pet-stretch {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(0.85); }
+  0%, 100% { transform: scaleX(var(--wg-flip, 1)) scaleY(1); }
+  50% { transform: scaleX(var(--wg-flip, 1)) scaleY(0.85); }
 }
 @keyframes wg-rua-pat {
   0% { transform: translateX(-50%) translateY(0); }
