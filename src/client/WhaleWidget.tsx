@@ -1,6 +1,9 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react'
 import { WIDGET_CSS } from './styles'
 import { ContextBar, WhaleState } from './ContextBar'
+import { Bubble } from './Bubble'
+import { EasterEgg } from './EasterEgg'
+import { pickRandomIdleLine } from './quotes'
 
 // DSH 运行时 Builtin（Client 侧），Package-private RPC 到宿主
 declare const host: {
@@ -25,9 +28,12 @@ export function WhaleWidget() {
   }))
   const [pressed, setPressed] = useState(false)
   const [state, setState] = useState<WhaleState>(EMPTY_STATE)
+  const [bubble, setBubble] = useState<string | null>(null)
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null)
+  const eggRef = useRef(new EasterEgg())
 
-  // 数据轮询（60s）：余额/用量/上下文
+  // 数据轮询（60s）
   useEffect(() => {
     let alive = true
     const load = () => {
@@ -37,7 +43,7 @@ export function WhaleWidget() {
           if (alive && s && typeof s === 'object') setState(s as WhaleState)
         })
         .catch(() => {
-          // host 未就绪，忽略
+          // host 未就绪
         })
     }
     load()
@@ -48,11 +54,18 @@ export function WhaleWidget() {
     }
   }, [])
 
+  // 时机彩蛋：上下文 >80% 触发一次吐槽
+  useEffect(() => {
+    const line = eggRef.current.onContextHigh(state.contextPct)
+    if (line) setBubble(line)
+  }, [state.contextPct])
+
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     const el = rootRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
     dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
+    pressStartRef.current = { x: e.clientX, y: e.clientY }
     setPressed(true)
     try {
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -70,8 +83,17 @@ export function WhaleWidget() {
   }, [])
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
+    const start = pressStartRef.current
+    const moved =
+      start !== null && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6
     dragRef.current = null
+    pressStartRef.current = null
     setPressed(false)
+    // 点击（非拖拽）：触发彩蛋/随机台词
+    if (!moved) {
+      const r = eggRef.current.onPress()
+      setBubble(r.kind === 'quote' ? r.text : pickRandomIdleLine())
+    }
     const el = rootRef.current
     if (el) {
       const rect = el.getBoundingClientRect()
@@ -102,6 +124,7 @@ export function WhaleWidget() {
       >
         <img className="wg-img" src="/dsh-whale-girl/whale-girl.png" alt="鲸鱼娘" draggable={false} />
         <ContextBar pct={state.contextPct} tokens={state.contextTokens} limit={state.contextLimit} />
+        {bubble && <Bubble text={bubble} onClose={() => setBubble(null)} />}
       </div>
     </>
   )

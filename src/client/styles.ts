@@ -59,4 +59,37 @@ export const WIDGET_CSS = `
   color: #dc2626;
   font-weight: 600;
 }
+.wg-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 8px);
+  transform: translateX(-50%);
+  max-width: 220px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(80, 110, 190, 0.3);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #2a3a66;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(30, 50, 120, 0.15);
+  z-index: 10000;
+  animation: wg-pop 180ms ease-out;
+  pointer-events: auto;
+}
+.wg-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgba(255, 255, 255, 0.95);
+}
+@keyframes wg-pop {
+  0% { transform: translateX(-50%) scale(0.85); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
 `
