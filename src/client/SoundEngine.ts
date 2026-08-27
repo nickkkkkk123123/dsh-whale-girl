@@ -46,6 +46,15 @@ export class SoundEngine {
     this.cute(760, 0.08, 'sine', 0.11)
   }
 
+  /** 撞边反馈音：duck 复用小黄鸭松手声，cute 用短促"波"音。 */
+  bounce() {
+    if (this.mode === 'duck') {
+      this.play(this.duckRelease)
+      return
+    }
+    this.cute(300, 0.07, 'triangle', 0.1)
+  }
+
   private play(a: HTMLAudioElement | null) {
     if (!a) return
     try {

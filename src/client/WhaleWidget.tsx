@@ -5,6 +5,7 @@ import { Bubble } from './Bubble'
 import { EasterEgg } from './EasterEgg'
 import { pickRandomIdleLine } from './quotes'
 import { SoundEngine } from './SoundEngine'
+import { FlingTracker, startFling } from './PhysicsFling'
 
 const EMPTY_STATE: WhaleState = {
   balance: null,
@@ -16,17 +17,27 @@ const EMPTY_STATE: WhaleState = {
   lastTurnCost: null
 }
 
+const WIDGET_W = 170
+const WIDGET_H = 180
+/** 松手速度（px/s）超过此值进入甩抛弹跳模式。 */
+const FLING_SPEED = 1200
+
 export function WhaleWidget() {
   const rootRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ x: number; y: number }>(() => ({
-    x: Math.max(0, window.innerWidth - 220),
-    y: Math.max(0, window.innerHeight - 260)
+    x: Math.max(0, window.innerWidth - WIDGET_W - 8),
+    y: Math.max(0, window.innerHeight - WIDGET_H - 8)
   }))
   const [pressed, setPressed] = useState(false)
+  const [flinging, setFlinging] = useState(false)
+  const [bounce, setBounce] = useState(false)
   const [state, setState] = useState<WhaleState>(EMPTY_STATE)
   const [bubble, setBubble] = useState<string | null>(null)
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
   const pressStartRef = useRef<{ x: number; y: number } | null>(null)
+  const trackerRef = useRef(new FlingTracker())
+  const flingRef = useRef<{ cancel: () => void } | null>(null)
+  const bounceTimerRef = useRef(0)
   const eggRef = useRef(new EasterEgg())
   const soundRef = useRef<SoundEngine | null>(null)
   if (soundRef.current === null) soundRef.current = new SoundEngine()
@@ -58,64 +69,129 @@ export function WhaleWidget() {
     if (line) setBubble(line)
   }, [state.contextPct])
 
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    const el = rootRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
-    pressStartRef.current = { x: e.clientX, y: e.clientY }
-    setPressed(true)
-    soundRef.current?.press()
-    try {
-      ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    } catch {
-      // ignore
+  // 卸载时清理弹跳循环与抖动画计时
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(bounceTimerRef.current)
+      flingRef.current?.cancel()
     }
   }, [])
+
+  const stopFling = useCallback(() => {
+    if (flingRef.current) {
+      flingRef.current.cancel()
+      flingRef.current = null
+    }
+    setFlinging(false)
+  }, [])
+
+  const shake = useCallback(() => {
+    setBounce(true)
+    window.clearTimeout(bounceTimerRef.current)
+    bounceTimerRef.current = window.setTimeout(() => setBounce(false), 300)
+  }, [])
+
+  /** 弹跳结束后：平滑吸附到最近侧边（保留当前垂直位置）。 */
+  const snap = useCallback((x: number, y: number) => {
+    const vw = window.innerWidth
+    const left = x + WIDGET_W / 2 < vw / 2 ? 8 : vw - WIDGET_W - 8
+    const top = Math.max(8, Math.min(window.innerHeight - WIDGET_H - 8, y))
+    setPos({ x: Math.max(8, left), y: top })
+  }, [])
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      const el = rootRef.current
+      if (!el) return
+      stopFling()
+      const rect = el.getBoundingClientRect()
+      dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
+      pressStartRef.current = { x: e.clientX, y: e.clientY }
+      trackerRef.current.clear()
+      setPressed(true)
+      soundRef.current?.press()
+      try {
+        ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+      } catch {
+        // ignore
+      }
+    },
+    [stopFling]
+  )
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return
+    trackerRef.current.push(e.clientX, e.clientY)
     setPos({
-      x: Math.max(0, Math.min(window.innerWidth - 170, e.clientX - dragRef.current.dx)),
-      y: Math.max(0, Math.min(window.innerHeight - 180, e.clientY - dragRef.current.dy))
+      x: Math.max(0, Math.min(window.innerWidth - WIDGET_W, e.clientX - dragRef.current.dx)),
+      y: Math.max(0, Math.min(window.innerHeight - WIDGET_H, e.clientY - dragRef.current.dy))
     })
   }, [])
 
-  const onPointerUp = useCallback((e: React.PointerEvent) => {
-    const start = pressStartRef.current
-    const moved =
-      start !== null && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6
-    dragRef.current = null
-    pressStartRef.current = null
-    setPressed(false)
-    soundRef.current?.release()
-    // 点击（非拖拽）：触发彩蛋/随机台词
-    if (!moved) {
-      const r = eggRef.current.onPress()
-      setBubble(r.kind === 'quote' ? r.text : pickRandomIdleLine())
-    }
-    const el = rootRef.current
-    if (el) {
-      const rect = el.getBoundingClientRect()
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const left = rect.left + rect.width / 2 < vw / 2 ? 8 : vw - rect.width - 8
-      const top = Math.max(8, Math.min(vh - rect.height - 8, rect.top))
-      setPos({ x: Math.max(8, left), y: top })
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      const start = pressStartRef.current
+      const moved = start !== null && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6
+      const vel = trackerRef.current.velocity()
+      trackerRef.current.clear()
+      dragRef.current = null
+      pressStartRef.current = null
+      setPressed(false)
+      soundRef.current?.release()
+
+      // 点击（非拖拽）：触发彩蛋/随机台词
+      if (!moved) {
+        const r = eggRef.current.onPress()
+        setBubble(r.kind === 'quote' ? r.text : pickRandomIdleLine())
+      } else if (vel && Math.hypot(vel.vx, vel.vy) >= FLING_SPEED) {
+        // 快速甩抛：进入弹跳模式
+        const el = rootRef.current
+        if (el) {
+          const rect = el.getBoundingClientRect()
+          setFlinging(true)
+          flingRef.current = startFling({
+            x: rect.left,
+            y: rect.top,
+            vx: vel.vx,
+            vy: vel.vy,
+            width: WIDGET_W,
+            height: WIDGET_H,
+            onMove: (x, y) => setPos({ x, y }),
+            onBounce: () => {
+              soundRef.current?.bounce()
+              shake()
+            },
+            onDone: (x, y) => {
+              flingRef.current = null
+              setFlinging(false)
+              snap(x, y)
+            }
+          })
+        }
+      } else {
+        // 慢速拖拽：正常吸附
+        const el = rootRef.current
+        if (el) {
+          const rect = el.getBoundingClientRect()
+          snap(rect.left, rect.top)
+        }
+      }
+
       try {
         ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
       } catch {
         // ignore
       }
-    }
-  }, [])
+    },
+    [shake, snap]
+  )
 
   return (
     <>
       <style>{WIDGET_CSS}</style>
       <div
         ref={rootRef}
-        className="wg-root"
+        className={`wg-root${flinging ? ' wg-flinging' : ''}${bounce ? ' wg-bounce' : ''}`}
         style={{ left: pos.x, top: pos.y, transform: pressed ? 'scale(0.9)' : undefined }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

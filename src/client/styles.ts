@@ -10,6 +10,19 @@ export const WIDGET_CSS = `
   touch-action: none;
   transition: transform 120ms ease, left 200ms ease, top 200ms ease;
 }
+.wg-flinging {
+  transition: none;
+}
+.wg-bounce .wg-img {
+  animation: wg-shake 240ms ease-out;
+}
+@keyframes wg-shake {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-8deg); }
+  40% { transform: rotate(7deg); }
+  60% { transform: rotate(-5deg); }
+  80% { transform: rotate(3deg); }
+}
 .wg-root:active { cursor: grabbing; }
 .wg-img {
   width: 100%;
