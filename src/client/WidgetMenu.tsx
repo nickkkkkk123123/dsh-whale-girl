@@ -13,6 +13,8 @@ export interface MenuConfig {
   ecoMode: boolean
   /** 毛玻璃强度（进度条底板 blur 像素，0=关闭），0~16 默认 4 */
   frost: number
+  /** 余额预警线（元）：低于该值时气泡提醒充值，0=关闭预警 */
+  lowBalance: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -36,7 +38,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   showPeak: true,
   slingPower: 20,
   ecoMode: true,
-  frost: 4
+  frost: 4,
+  lowBalance: 10
 }
 
 interface Props {

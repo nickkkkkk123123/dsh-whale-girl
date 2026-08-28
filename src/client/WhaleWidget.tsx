@@ -43,7 +43,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     showPeak: any.showPeak !== false,
     slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20,
     ecoMode: any.ecoMode !== false,
-    frost: Number.isFinite(Number(any.frost)) ? Math.min(16, Math.max(0, Math.round(Number(any.frost)))) : 4
+    frost: Number.isFinite(Number(any.frost)) ? Math.min(16, Math.max(0, Math.round(Number(any.frost)))) : 4,
+    lowBalance: Number.isFinite(Number(any.lowBalance)) ? Math.max(0, Number(any.lowBalance)) : 10
   }
 }
 
@@ -88,6 +89,11 @@ export function WhaleWidget() {
   const slingOriginRef = useRef<{ x: number; y: number } | null>(null)
   // 省电模式空闲计时器
   const ecoTimerRef = useRef(0)
+  // 实用提醒状态：上下文 90% 每页面提醒一次；余额跟踪上次值（跨阈值向下才提醒）
+  const ctxWarnedRef = useRef(false)
+  const prevBalanceRef = useRef<number | null>(null)
+  // 空闲彩蛋计时器
+  const idleEggTimerRef = useRef(0)
   const trackerRef = useRef(new FlingTracker())
   const flingRef = useRef<{ cancel: () => void } | null>(null)
   const bounceTimerRef = useRef(0)
@@ -144,6 +150,47 @@ export function WhaleWidget() {
       window.clearTimeout(hideTimer)
     }
   }, [config.showBubble])
+
+  // 实用提醒：上下文 ≥90% 建议开新会话（每次页面加载只提醒一次）
+  useEffect(() => {
+    if (!config.showBubble || ctxWarnedRef.current) return
+    if (state.contextPct >= 0.9) {
+      ctxWarnedRef.current = true
+      setBubble(
+        `上下文已经 ${Math.round(state.contextPct * 100)}% 啦，快满了！建议开个新会话，不然回复会被截断哦～`
+      )
+    }
+  }, [state.contextPct, config.showBubble])
+
+  // 实用提醒：余额跌破预警线（config.lowBalance，0=关闭）；充值回升后再次跌破会重新提醒
+  useEffect(() => {
+    if (!config.showBubble || config.lowBalance <= 0) return
+    const bal = state.balance
+    if (bal === null || bal < 0) return
+    const prev = prevBalanceRef.current
+    prevBalanceRef.current = bal
+    if ((prev === null || prev >= config.lowBalance) && bal < config.lowBalance) {
+      setBubble(`余额只剩 ¥${bal.toFixed(2)} 啦，记得去充一点哦～`)
+    }
+  }, [state.balance, config.showBubble, config.lowBalance])
+
+  // 空闲彩蛋：2~5 分钟（随机）无交互时自己说一句；说话即唤醒动画，说完继续省电
+  useEffect(() => {
+    if (!config.showBubble) return
+    const schedule = () => {
+      window.clearTimeout(idleEggTimerRef.current)
+      idleEggTimerRef.current = window.setTimeout(
+        () => {
+          setBubble(pickRandomIdleLine())
+          markActive()
+          schedule()
+        },
+        120000 + Math.floor(Math.random() * 180000)
+      )
+    }
+    schedule()
+    return () => window.clearTimeout(idleEggTimerRef.current)
+  }, [config.showBubble, markActive])
 
   // 数据：宿主在页面顶层注入桥接脚本拉取数据并 postMessage 广播（slots 组件自身 fetch 会被 webserver 403 拦）
   useEffect(() => {
@@ -214,6 +261,7 @@ export function WhaleWidget() {
       window.clearTimeout(bounceTimerRef.current)
       window.clearTimeout(petTimerRef.current)
       window.clearTimeout(ecoTimerRef.current)
+      window.clearTimeout(idleEggTimerRef.current)
       flingRef.current?.cancel()
     }
   }, [])
