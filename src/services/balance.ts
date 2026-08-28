@@ -26,17 +26,24 @@ export async function fetchBalance(
   return { totalBalance: Number(info.total_balance), currency: info.currency ?? 'CNY' }
 }
 
-/** 硅基流动余额：GET /v1/user/info → data.balance（CNY）。 */
+/**
+ * 硅基流动余额：GET {base}/user/info → data.balance / data.totalBalance。
+ * base 从 provider 的 baseURL 推导（CN: api.siliconflow.cn/v1，国际: api.siliconflow.com/v1，
+ * 两者账号体系独立）。CN 域名的该端点已于 2026-08 被 410 废弃且暂无替代，
+ * 失败时由调用方回退到通用探测链。
+ */
 export async function fetchSiliconflowBalance(
   apiKey: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  base = 'https://api.siliconflow.cn/v1'
 ): Promise<BalanceResult> {
-  const res = await fetchImpl('https://api.siliconflow.cn/v1/user/info', {
+  const root = base.replace(/\/+$/, '')
+  const res = await fetchImpl(`${root}/user/info`, {
     headers: { Authorization: `Bearer ${apiKey}` }
   })
   if (!res.ok) throw new Error(`siliconflow balance failed: ${res.status}`)
-  const json = (await res.json()) as { data?: { balance?: string } }
-  const raw = json.data?.balance
+  const json = (await res.json()) as { data?: { balance?: string; totalBalance?: string } }
+  const raw = json.data?.totalBalance ?? json.data?.balance
   if (raw === undefined) throw new Error('siliconflow balance missing')
   return { totalBalance: Number(raw), currency: 'CNY' }
 }
@@ -126,6 +133,14 @@ export async function fetchProviderBalance(
   apiKey: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<BalanceResult | null> {
+  // 硅基流动：专用查询走 provider 自己的 baseURL（区分 CN / 国际域名）
+  if (query.family === 'siliconflow') {
+    try {
+      return await fetchSiliconflowBalance(apiKey, fetchImpl, query.baseURL ?? 'https://api.siliconflow.cn/v1')
+    } catch {
+      // fall through to generic probe
+    }
+  }
   const known = BALANCE_FETCHERS[query.family]
   if (known) {
     try {
