@@ -4,7 +4,9 @@ export const WIDGET_CSS = `
   position: fixed;
   width: 170px;
   height: 170px;
-  z-index: 9999;
+  /* 最高层级：确保不被 better-sidebar 等其他插件遮挡 */
+  z-index: 2147483647 !important;
+  isolation: isolate;
   cursor: grab;
   user-select: none;
   touch-action: none;
