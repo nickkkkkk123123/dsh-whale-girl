@@ -1,12 +1,14 @@
 import React, { useEffect, useRef } from 'react'
 
-/** 挂件配置（音效 + 显示模块开关）。持久化到 ~/.dsh/.whale-girl-config.json */
+/** 挂件配置（音效 + 显示模块开关 + 弹弓力度）。持久化到 ~/.dsh/.whale-girl-config.json */
 export interface MenuConfig {
   soundMode: 'cute' | 'duck'
   showProgress: boolean
   showBubble: boolean
   showBalance: boolean
   showPeak: boolean
+  /** 中键弹弓发射力度系数（松手速度 = 拉开距离 × 该系数），范围 5~60 */
+  slingPower: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -27,7 +29,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   showProgress: true,
   showBubble: true,
   showBalance: true,
-  showPeak: true
+  showPeak: true,
+  slingPower: 20
 }
 
 interface Props {
@@ -65,7 +68,7 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
 
   const menuW = 210
   const left = Math.max(8, Math.min(x, window.innerWidth - menuW - 8))
-  const top = Math.max(8, Math.min(y, window.innerHeight - 380))
+  const top = Math.max(8, Math.min(y, window.innerHeight - 460))
 
   const set = (patch: Partial<MenuConfig>) => onChange({ ...config, ...patch })
 
@@ -110,6 +113,22 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ soundMode: 'duck' })}>
         <span className={`wg-menu-radio${config.soundMode === 'duck' ? ' on' : ''}`} /> 鸭叫
+      </div>
+      <div className="wg-menu-divider" />
+      <div className="wg-menu-title">
+        弹弓发射力度 <span className="wg-menu-power">×{config.slingPower}</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={5}
+          max={60}
+          step={5}
+          value={config.slingPower}
+          onChange={(e) => set({ slingPower: Number(e.target.value) })}
+          title="中键拖拽松手时的发射力度（拉开距离 × 力度）"
+        />
       </div>
       <div className="wg-menu-divider" />
       <div className="wg-menu-title">显示模块</div>

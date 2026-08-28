@@ -24,6 +24,9 @@ const EMPTY_STATE: WhaleState = {
 /** 本地兜底配置 key（宿主 api/config 不可达时使用）。 */
 const CONFIG_KEY = 'whale-girl-config'
 
+/** 中键弹弓功能提示气泡（只提示一次）。 */
+const SLING_HINT = '悄悄告诉你：按住中键拖拽再松手，我会像弹弓一样发射！右键菜单可以调发射力度哦～'
+
 const WIDGET_W = 170
 const WIDGET_H = 180
 /** 松手速度（px/s）超过此值进入甩抛弹跳模式。 */
@@ -31,12 +34,14 @@ const FLING_SPEED = 800
 
 function normalizeConfig(o: unknown): MenuConfig {
   const any = (o && typeof o === 'object' ? o : {}) as Record<string, unknown>
+  const power = Number(any.slingPower)
   return {
     soundMode: any.soundMode === 'duck' ? 'duck' : 'cute',
     showProgress: any.showProgress !== false,
     showBubble: any.showBubble !== false,
     showBalance: any.showBalance !== false,
-    showPeak: any.showPeak !== false
+    showPeak: any.showPeak !== false,
+    slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20
   }
 }
 
@@ -90,6 +95,32 @@ export function WhaleWidget() {
   useEffect(() => {
     soundRef.current?.setMode(config.soundMode)
   }, [config.soundMode])
+
+  // 彩蛋提示：首次加载 3 秒后用气泡介绍中键弹弓功能（localStorage 记忆，只提示一次）
+  useEffect(() => {
+    if (!config.showBubble) return
+    let hinted = false
+    try {
+      hinted = localStorage.getItem('wg-sling-hinted') === '1'
+    } catch {
+      hinted = false
+    }
+    if (hinted) return
+    let hideTimer = 0
+    const showTimer = window.setTimeout(() => {
+      try {
+        localStorage.setItem('wg-sling-hinted', '1')
+      } catch {
+        // ignore
+      }
+      setBubble(SLING_HINT)
+      hideTimer = window.setTimeout(() => setBubble((b) => (b === SLING_HINT ? null : b)), 9000)
+    }, 3000)
+    return () => {
+      window.clearTimeout(showTimer)
+      window.clearTimeout(hideTimer)
+    }
+  }, [config.showBubble])
 
   // 数据：宿主在页面顶层注入桥接脚本拉取数据并 postMessage 广播（slots 组件自身 fetch 会被 webserver 403 拦）
   useEffect(() => {
@@ -348,8 +379,8 @@ export function WhaleWidget() {
           const dy = fromY - toY
           const dist = Math.hypot(dx, dy)
           if (dist > 10) {
-            // 速度与拉开的距离成正比（弹弓手感），不设上限
-            const speed = dist * 20
+            // 速度与拉开的距离成正比（弹弓手感），系数可在右键菜单调节，不设上限
+            const speed = dist * (config.slingPower || 20)
             const vx = (dx / dist) * speed
             const vy = (dy / dist) * speed
             setFlinging(true)
@@ -461,7 +492,7 @@ export function WhaleWidget() {
         // ignore
       }
     },
-    [shake, snap, config.showBubble, reportEvent]
+    [shake, snap, config.showBubble, config.slingPower, reportEvent]
   )
 
   // 窗口变化：把挂件 clamp 回窗口内，并依据相对位移给动量，让它在窗口内反弹

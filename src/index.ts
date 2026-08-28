@@ -37,6 +37,8 @@ export interface WidgetConfig {
   showBalance: boolean
   /** 是否在进度条详情里显示峰谷提醒 */
   showPeak: boolean
+  /** 中键弹弓发射力度系数（松手速度 = 拉开距离 × 该系数），范围 5~60 */
+  slingPower: number
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -44,17 +46,20 @@ const DEFAULT_CONFIG: WidgetConfig = {
   showProgress: true,
   showBubble: true,
   showBalance: true,
-  showPeak: true
+  showPeak: true,
+  slingPower: 20
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const power = Number(o.slingPower)
   return {
     soundMode: o.soundMode === 'duck' ? 'duck' : 'cute',
     showProgress: o.showProgress !== false,
     showBubble: o.showBubble !== false,
     showBalance: o.showBalance !== false,
-    showPeak: o.showPeak !== false
+    showPeak: o.showPeak !== false,
+    slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20
   }
 }
 

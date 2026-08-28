@@ -314,4 +314,43 @@ export const WIDGET_CSS = `
   background: rgba(80, 110, 190, 0.15);
   margin: 4px 6px;
 }
+.wg-menu-power {
+  color: #4a6cf7;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.wg-menu-slider-row {
+  padding: 8px 10px 9px;
+}
+.wg-menu-slider {
+  display: block;
+  width: 100%;
+  height: 5px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: linear-gradient(90deg, #4a6cf7, #9db6ff);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+.wg-menu-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3.5px solid #4a6cf7;
+  box-shadow: 0 1px 5px rgba(30, 50, 120, 0.35);
+  cursor: pointer;
+}
+.wg-menu-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3.5px solid #4a6cf7;
+  box-shadow: 0 1px 5px rgba(30, 50, 120, 0.35);
+  cursor: pointer;
+}
 `
