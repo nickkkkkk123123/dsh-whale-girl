@@ -228,7 +228,8 @@ export const WIDGET_CSS = `
   /* 与 .wg-root 同级 z-index：菜单在 DOM 中位于挂件之后，同值时后者在上，保证菜单盖住贴图 */
   z-index: 2147483647;
   min-width: 190px;
-  background: rgba(255, 255, 255, 0.97);
+  /* 透明度跟随「底板透明度」滑块（--wg-panel-alpha 由菜单根节点注入） */
+  background: rgba(255, 255, 255, var(--wg-panel-alpha, 0.97));
   border: 1px solid rgba(80, 110, 190, 0.28);
   border-radius: 12px;
   padding: 6px;

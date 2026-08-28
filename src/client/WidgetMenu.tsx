@@ -87,7 +87,7 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
   return (
     <div
       className="wg-menu"
-      style={{ left, top, width: menuW }}
+      style={{ left, top, width: menuW, '--wg-panel-alpha': config.panelOpacity } as React.CSSProperties}
       ref={ref}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
@@ -160,18 +160,18 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-divider" />
       <div className="wg-menu-title">
-        底板透明度 <span className="wg-menu-power">{Math.round(config.panelOpacity * 100)}%</span>
+        底板透明度 <span className="wg-menu-power">{Math.round((1 - config.panelOpacity) * 100)}%</span>
       </div>
       <div className="wg-menu-slider-row">
         <input
           className="wg-menu-slider"
           type="range"
-          min={20}
-          max={100}
+          min={0}
+          max={80}
           step={5}
-          value={Math.round(config.panelOpacity * 100)}
-          onChange={(e) => set({ panelOpacity: Number(e.target.value) / 100 })}
-          title="进度条底板的不透明度（越小越透，透出挂件背后的页面内容）"
+          value={Math.round((1 - config.panelOpacity) * 100)}
+          onChange={(e) => set({ panelOpacity: (100 - Number(e.target.value)) / 100 })}
+          title="进度条底板的透明度：拉得越高越透，透出挂件背后的页面内容（上限 80% 以保证文字可读）"
         />
       </div>
       <div className="wg-menu-divider" />
