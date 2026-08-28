@@ -113,13 +113,25 @@ function parseSettings(text: string): {
   return { providers, current }
 }
 
-/** 读取 settings.yaml，返回可切换的提供方列表。 */
+/** 读取 settings.yaml，返回可切换的提供方列表。始终包含内置的 DeepSeek 官方。 */
 export function listProviders(): ProviderEntry[] {
+  let providers: ProviderEntry[] = []
   try {
-    return parseSettings(fs.readFileSync(settingsPath(), 'utf8')).providers
+    providers = parseSettings(fs.readFileSync(settingsPath(), 'utf8')).providers
   } catch {
-    return []
+    providers = []
   }
+  // deepseek-official 是 DSH 内置 provider，不在 settings.yaml 里声明；
+  // 始终加入列表（放在最前），否则从它切走后就无法在菜单里切回来。
+  if (!providers.some(p => p.id === 'deepseek-official')) {
+    providers.unshift({
+      id: 'deepseek-official',
+      name: displayNameOf('deepseek-official'),
+      family: 'deepseek',
+      apiKeyEnv: 'DEEPSEEK_API_KEY'
+    })
+  }
+  return providers
 }
 
 /** 当前默认模型路由（settings.yaml 的 agent-default-model）。 */
