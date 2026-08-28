@@ -8,7 +8,7 @@ import { SoundEngine } from './SoundEngine'
 import { FlingTracker, startFling } from './PhysicsFling'
 import { WHALE_GIRL_DATA_URL } from './whaleDataUrl'
 import { RUA_GIF_URL } from './ruaDataUrl'
-import { WidgetMenu, MenuConfig, DEFAULT_MENU_CONFIG } from './WidgetMenu'
+import { WidgetMenu, MenuConfig, DEFAULT_MENU_CONFIG, ProviderRow } from './WidgetMenu'
 
 const EMPTY_STATE: WhaleState = {
   balance: null,
@@ -67,6 +67,8 @@ export function WhaleWidget() {
   const [bubble, setBubble] = useState<string | null>(null)
   const [imgSrc] = useState<string>(WHALE_GIRL_DATA_URL)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [providers, setProviders] = useState<ProviderRow[] | null>(null)
+  const [switching, setSwitching] = useState<string | null>(null)
   const [config, setConfig] = useState<MenuConfig>(loadLocalConfig)
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
   const pressStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -161,7 +163,46 @@ export function WhaleWidget() {
     e.preventDefault()
     e.stopPropagation()
     setMenu({ x: e.clientX, y: e.clientY })
+    setProviders(null)
+    fetch('/dsh-whale-girl/api/providers', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && Array.isArray(d.providers)) setProviders(d.providers)
+        else setProviders([])
+      })
+      .catch(() => setProviders([]))
   }, [])
+
+  // Switch default API provider (writes agent-default-model in settings.yaml)
+  const handleSwitchProvider = useCallback((id: string) => {
+    const row = providers?.find((p) => p.id === id)
+    if (!row || switching) return
+    setSwitching(id)
+    const MODEL_BY_PROVIDER: Record<string, string> = {
+      'zai-coding-cn': 'glm-5.3-flash',
+      siliconflow: 'deepseek-ai/DeepSeek-V4-Flash',
+      'deepseek-official': 'deepseek-v4-flash'
+    }
+    const model = MODEL_BY_PROVIDER[id] ?? ''
+    fetch('/dsh-whale-girl/api/select-model', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: id, model })
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.ok) {
+          setBubble('已切换到 ' + (row.name || id))
+        } else {
+          setBubble('切换失败，请检查模型配置')
+        }
+      })
+      .catch(() => setBubble('切换失败，网络错误'))
+      .finally(() => {
+        setSwitching(null)
+        window.setTimeout(() => setBubble(null), 3000)
+      })
+  }, [providers, switching])
 
   const resetPosition = useCallback(() => {
     setPos({
@@ -414,6 +455,9 @@ export function WhaleWidget() {
           onChange={persistConfig}
           onResetPosition={resetPosition}
           onClose={() => setMenu(null)}
+          providers={providers}
+          onSwitchProvider={handleSwitchProvider}
+          switching={switching}
         />
       )}
     </>

@@ -224,13 +224,14 @@ export const WIDGET_CSS = `
 
 .wg-menu {
   position: fixed;
+  /* 与 .wg-root 同级 z-index：菜单在 DOM 中位于挂件之后，同值时后者在上，保证菜单盖住贴图 */
+  z-index: 2147483647;
   min-width: 190px;
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid rgba(80, 110, 190, 0.28);
   border-radius: 12px;
   padding: 6px;
   box-shadow: 0 8px 28px rgba(30, 50, 120, 0.22);
-  z-index: 10010;
   font-size: 13px;
   color: #2a3a66;
   user-select: none;
@@ -254,6 +255,24 @@ export const WIDGET_CSS = `
 }
 .wg-menu-item:hover {
   background: rgba(80, 110, 190, 0.1);
+}.wg-menu-item.wg-menu-active {
+  background: rgba(80, 110, 190, 0.14);
+}
+.wg-menu-muted {
+  color: #8a8f9c;
+  cursor: default;
+}
+.wg-menu-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.wg-menu-balance {
+  font-size: 11px;
+  color: #8a8f9c;
+  white-space: nowrap;
 }
 .wg-menu-radio {
   width: 10px;

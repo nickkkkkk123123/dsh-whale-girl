@@ -9,6 +9,17 @@ export interface MenuConfig {
   showPeak: boolean
 }
 
+/** API 提供方条目（host /api/providers 返回）。 */
+export interface ProviderRow {
+  id: string
+  name: string
+  family: string
+  apiKeyEnv?: string
+  balance: number | null
+  currency: string
+  active: boolean
+}
+
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
   soundMode: 'cute',
   showProgress: true,
@@ -24,9 +35,15 @@ interface Props {
   onChange: (next: MenuConfig) => void
   onResetPosition: () => void
   onClose: () => void
+  /** API 提供方列表（null = 尚未加载）。 */
+  providers: ProviderRow[] | null
+  /** 切换默认模型提供方。 */
+  onSwitchProvider: (id: string) => void
+  /** 切换中的 provider id（防止重复点击）。 */
+  switching: string | null
 }
 
-export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose }: Props) {
+export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, providers, onSwitchProvider, switching }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,20 +61,47 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose }:
     }
   }, [onClose])
 
-  const menuW = 190
+  const menuW = 210
   const left = Math.max(8, Math.min(x, window.innerWidth - menuW - 8))
-  const top = Math.max(8, Math.min(y, window.innerHeight - 280))
+  const top = Math.max(8, Math.min(y, window.innerHeight - 380))
 
   const set = (patch: Partial<MenuConfig>) => onChange({ ...config, ...patch })
 
   return (
     <div
       className="wg-menu"
-      style={{ left, top }}
+      style={{ left, top, width: menuW }}
       ref={ref}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
+      <div className="wg-menu-title">API 提供方</div>
+      {providers === null ? (
+        <div className="wg-menu-item wg-menu-muted">加载中…</div>
+      ) : providers.length === 0 ? (
+        <div className="wg-menu-item wg-menu-muted">未配置提供方</div>
+      ) : (
+        providers.map((p) => (
+          <div
+            key={p.id}
+            className={`wg-menu-item${p.active ? ' wg-menu-active' : ''}`}
+            onClick={() => {
+              if (p.active || switching) return
+              onSwitchProvider(p.id)
+            }}
+            title={p.active ? '当前使用中' : switching === p.id ? '切换中…' : '点击切换为此提供方'}
+          >
+            <span className={`wg-menu-radio${p.active ? ' on' : ''}`} />
+            <span className="wg-menu-col">
+              <span>{p.name}{switching === p.id ? ' …' : ''}</span>
+              <span className="wg-menu-balance">
+                {p.balance === null ? '余额未知' : `¥${p.balance.toFixed(2)}`}
+              </span>
+            </span>
+          </div>
+        ))
+      )}
+      <div className="wg-menu-divider" />
       <div className="wg-menu-title">音效</div>
       <div className="wg-menu-item" onClick={() => set({ soundMode: 'cute' })}>
         <span className={`wg-menu-radio${config.soundMode === 'cute' ? ' on' : ''}`} /> 可爱合成音

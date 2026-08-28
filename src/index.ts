@@ -1,4 +1,5 @@
-import { fetchBalance, Ledger } from './services/balance'
+import { fetchBalance, Ledger, fetchProviderBalance } from './services/balance'
+import { listProviders, currentModel, selectModel } from './services/providers'
 import { computeContextPct, DEFAULT_CONTEXT_LIMIT } from './services/context'
 import { estimateCost } from './services/turnCost'
 import fs from 'node:fs'
@@ -311,6 +312,71 @@ export function apply(ctx: any) {
           diag(`event: ${body.slice(0, 200)}`)
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
           res.end('{"ok":true}')
+        })
+      }
+    })
+
+    // API providers list + per-provider balance (parallel; null when unsupported)
+    server.register({
+      kind: 'exact',
+      path: '/dsh-whale-girl/api/providers',
+      handler: (req: unknown, res: any) => {
+        void (async () => {
+          const creds = ctx.credentials ?? ctx.get('credentials')
+          const cur = currentModel()
+          const rows = await Promise.all(listProviders().map(async (p) => {
+            let balance: number | null = null
+            let currency = 'CNY'
+            if (p.apiKeyEnv && creds) {
+              try {
+                const ref = await creds.resolve(p.apiKeyEnv)
+                const key = typeof ref === 'string' ? ref : ref && typeof ref === 'object' ? (ref as any).value : undefined
+                if (key) {
+                  const r = await fetchProviderBalance({ family: p.family, baseURL: p.baseURL }, key)
+                  if (r) { balance = r.totalBalance; currency = r.currency }
+                }
+              } catch {
+                // balance stays null
+              }
+            }
+            return { ...p, balance, currency, active: p.id === cur.provider }
+          }))
+          res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store'
+          })
+          res.end(JSON.stringify({ providers: rows, current: cur }))
+        })()
+      }
+    })
+
+    // Switch default model route (writes agent-default-model in settings.yaml)
+    server.register({
+      kind: 'exact',
+      path: '/dsh-whale-girl/api/select-model',
+      handler: (req: any, res: any) => {
+        let body = ''
+        req.on('data', (c: Buffer) => {
+          body += String(c)
+        })
+        req.on('end', () => {
+          try {
+            const parsed = JSON.parse(body) as { provider?: string; model?: string }
+            const provider = String(parsed.provider ?? '')
+            const model = String(parsed.model ?? '')
+            if (!provider || !model) {
+              res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' })
+              res.end(JSON.stringify({ ok: false, error: 'provider and model required' }))
+              return
+            }
+            const ok = selectModel(provider, model)
+            diag(`select-model ${provider}/${model} ok=${ok}`)
+            res.writeHead(ok ? 200 : 500, { 'Content-Type': 'application/json; charset=utf-8' })
+            res.end(JSON.stringify({ ok }))
+          } catch {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' })
+            res.end(JSON.stringify({ ok: false, error: 'bad json' }))
+          }
         })
       }
     })
