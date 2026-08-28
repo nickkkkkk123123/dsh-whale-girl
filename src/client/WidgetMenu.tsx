@@ -18,6 +18,8 @@ export interface ProviderRow {
   balance: number | null
   currency: string
   active: boolean
+  /** 该 provider 声明的模型 id 列表（切换时默认选第一个）。 */
+  models?: string[]
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {

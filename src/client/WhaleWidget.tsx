@@ -178,12 +178,13 @@ export function WhaleWidget() {
     const row = providers?.find((p) => p.id === id)
     if (!row || switching) return
     setSwitching(id)
-    const MODEL_BY_PROVIDER: Record<string, string> = {
+    // 优先用该 provider 在 settings.yaml 里声明的第一个模型；未声明时回退已知映射
+    const FALLBACK_MODEL: Record<string, string> = {
       'zai-coding-cn': 'glm-5.3-flash',
       siliconflow: 'deepseek-ai/DeepSeek-V4-Flash',
       'deepseek-official': 'deepseek-v4-flash'
     }
-    const model = MODEL_BY_PROVIDER[id] ?? ''
+    const model = row.models && row.models.length > 0 ? row.models[0] : (FALLBACK_MODEL[id] ?? '')
     fetch('/dsh-whale-girl/api/select-model', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

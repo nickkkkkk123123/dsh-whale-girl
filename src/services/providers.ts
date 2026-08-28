@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import yaml from 'js-yaml'
 
 /** 一个可切换的 API 提供方（模型路由）。 */
 export interface ProviderEntry {
@@ -14,6 +15,8 @@ export interface ProviderEntry {
   apiKeyEnv?: string
   /** OpenAI 兼容 baseURL（用于通用余额探测）。 */
   baseURL?: string
+  /** 该 provider 声明的模型 id 列表（切换时默认选第一个）。 */
+  models?: string[]
 }
 
 function settingsPath(): string {
@@ -38,86 +41,41 @@ function displayNameOf(id: string): string {
   return NAMES[id] ?? id
 }
 
-/**
- * 轻量行级 YAML 提取（settings.yaml 结构简单且可预测，避免引入 js-yaml 依赖）。
- * 提取 1) 两个 provider 段的 key 列表及其 apiKeyEnv/baseURL  2) agent-default-model。
- */
-function parseSettings(text: string): {
-  providers: ProviderEntry[]
-  current: { provider: string; model: string }
-} {
-  const lines = text.split(/\r?\n/)
-  const providers: ProviderEntry[] = []
-  let current = { provider: '', model: '' }
-
-  // 当前所属段（llm-pi-ai / llm-openai-compatible / agent-default-model）
-  let section: 'pi' | 'oc' | 'adm' | null = null
-  // provider 子段层级：section 下的 providers: → 其下的 key:
-  let inProviders = false
-  let activeId: string | null = null
-
-  const pushProvider = (id: string) => {
-    if (id && !providers.some(p => p.id === id)) {
-      providers.push({ id, name: displayNameOf(id), family: familyOf(id) })
-    }
+/** 从一个 provider 配置对象里提取 apiKeyEnv / baseURL / models。 */
+function entryFromConfig(id: string, cfg: unknown): ProviderEntry {
+  const o = (cfg && typeof cfg === 'object' ? cfg : {}) as Record<string, unknown>
+  let models: string[] | undefined
+  if (Array.isArray(o.models)) {
+    models = o.models
+      .map((m) => (m && typeof m === 'object' ? String((m as Record<string, unknown>).id ?? '') : String(m)))
+      .filter((s) => s !== '')
   }
-
-  for (const line of lines) {
-    const m = /^(\s*)([A-Za-z0-9_-]+):/.exec(line)
-    if (!m) continue
-    const indent = m[1].length
-    const key = m[2]
-
-    if (indent === 0) {
-      // 顶层段切换
-      section = key === 'llm-pi-ai' ? 'pi' : key === 'llm-openai-compatible' ? 'oc' : key === 'agent-default-model' ? 'adm' : null
-      inProviders = false
-      activeId = null
-      continue
-    }
-    if (section === 'adm') {
-      if (key === 'provider') current.provider = line.split(':')[1]?.trim() ?? ''
-      if (key === 'model') current.model = line.split(':')[1]?.trim() ?? ''
-      continue
-    }
-    if (section === 'pi' || section === 'oc') {
-      if (indent === 2 && key === 'providers') { inProviders = true; activeId = null; continue }
-      if (inProviders && indent === 4 && line.includes(':') && !line.trim().startsWith('-')) {
-        // provider key 行（4 空格缩进）；内联对象 { apiKeyEnv: X, baseURL: Y } 也在此捕获
-        const inline = line.split(':').slice(1).join(':')
-        activeId = key
-        pushProvider(key)
-        const p = providers.find(x => x.id === activeId)
-        if (p) {
-          const env = /apiKeyEnv\s*:\s*([A-Z0-9_]+)/.exec(inline)
-          if (env) p.apiKeyEnv = env[1]
-          const bu = /baseURL\s*:\s*['"]?([^'"}\s]+)/.exec(inline)
-          if (bu) p.baseURL = bu[1].trim()
-        }
-        continue
-      }
-      if (inProviders && activeId && indent >= 6) {
-        const p = providers.find(x => x.id === activeId)
-        if (!p) continue
-        if (key === 'apiKeyEnv') {
-          p.apiKeyEnv = line.split(':')[1]?.trim()
-          continue
-        }
-        if (key === 'baseURL') {
-          p.baseURL = line.split(':').slice(1).join(':').trim()
-          continue
-        }
-      }
-    }
+  return {
+    id,
+    name: displayNameOf(id),
+    family: familyOf(id),
+    apiKeyEnv: typeof o.apiKeyEnv === 'string' ? o.apiKeyEnv : undefined,
+    baseURL: typeof o.baseURL === 'string' ? o.baseURL : undefined,
+    models: models && models.length > 0 ? models : undefined
   }
-  return { providers, current }
 }
 
-/** 读取 settings.yaml，返回可切换的提供方列表。始终包含内置的 DeepSeek 官方。 */
+/**
+ * 读取 settings.yaml，返回可切换的提供方列表。
+ * 用完整 YAML 解析（js-yaml），覆盖任意书写风格；始终包含内置的 DeepSeek 官方。
+ */
 export function listProviders(): ProviderEntry[] {
   let providers: ProviderEntry[] = []
   try {
-    providers = parseSettings(fs.readFileSync(settingsPath(), 'utf8')).providers
+    const doc = (yaml.load(fs.readFileSync(settingsPath(), 'utf8')) ?? {}) as Record<string, any>
+    const sections = [doc['llm-pi-ai']?.providers, doc['llm-openai-compatible']?.providers]
+    for (const section of sections) {
+      if (section && typeof section === 'object') {
+        for (const [id, cfg] of Object.entries(section as Record<string, unknown>)) {
+          if (!providers.some(p => p.id === id)) providers.push(entryFromConfig(id, cfg))
+        }
+      }
+    }
   } catch {
     providers = []
   }
@@ -128,7 +86,8 @@ export function listProviders(): ProviderEntry[] {
       id: 'deepseek-official',
       name: displayNameOf('deepseek-official'),
       family: 'deepseek',
-      apiKeyEnv: 'DEEPSEEK_API_KEY'
+      apiKeyEnv: 'DEEPSEEK_API_KEY',
+      models: ['deepseek-v4-flash', 'deepseek-v4-pro']
     })
   }
   return providers
@@ -137,7 +96,12 @@ export function listProviders(): ProviderEntry[] {
 /** 当前默认模型路由（settings.yaml 的 agent-default-model）。 */
 export function currentModel(): { provider: string; model: string } {
   try {
-    return parseSettings(fs.readFileSync(settingsPath(), 'utf8')).current
+    const doc = (yaml.load(fs.readFileSync(settingsPath(), 'utf8')) ?? {}) as Record<string, any>
+    const m = doc['agent-default-model']
+    return {
+      provider: typeof m?.provider === 'string' ? m.provider : '',
+      model: typeof m?.model === 'string' ? m.model : ''
+    }
   } catch {
     return { provider: '', model: '' }
   }
@@ -145,7 +109,7 @@ export function currentModel(): { provider: string; model: string } {
 
 /**
  * 切换全局默认模型路由（写 settings.yaml 的 agent-default-model）。
- * 用行级替换保持文件其余部分不动；返回是否成功。
+ * 用行级替换保持文件其余部分（注释、格式）不动；返回是否成功。
  */
 export function selectModel(provider: string, model: string): boolean {
   try {
