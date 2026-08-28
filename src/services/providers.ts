@@ -1,7 +1,9 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import yaml from 'js-yaml'
+// 用命名导入（而非 default）：js-yaml 的 ESM 没有 default 导出，
+// default 导入在 tsdown 某些产物下会运行时报 "does not provide an export named 'default'"。
+import { load } from 'js-yaml'
 
 /** 一个可切换的 API 提供方（模型路由）。 */
 export interface ProviderEntry {
@@ -67,7 +69,7 @@ function entryFromConfig(id: string, cfg: unknown): ProviderEntry {
 export function listProviders(): ProviderEntry[] {
   let providers: ProviderEntry[] = []
   try {
-    const doc = (yaml.load(fs.readFileSync(settingsPath(), 'utf8')) ?? {}) as Record<string, any>
+    const doc = (load(fs.readFileSync(settingsPath(), 'utf8')) ?? {}) as Record<string, any>
     const sections = [doc['llm-pi-ai']?.providers, doc['llm-openai-compatible']?.providers]
     for (const section of sections) {
       if (section && typeof section === 'object') {
@@ -96,7 +98,7 @@ export function listProviders(): ProviderEntry[] {
 /** 当前默认模型路由（settings.yaml 的 agent-default-model）。 */
 export function currentModel(): { provider: string; model: string } {
   try {
-    const doc = (yaml.load(fs.readFileSync(settingsPath(), 'utf8')) ?? {}) as Record<string, any>
+    const doc = (load(fs.readFileSync(settingsPath(), 'utf8')) ?? {}) as Record<string, any>
     const m = doc['agent-default-model']
     return {
       provider: typeof m?.provider === 'string' ? m.provider : '',
