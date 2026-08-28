@@ -9,6 +9,10 @@ export interface MenuConfig {
   showPeak: boolean
   /** 中键弹弓发射力度系数（松手速度 = 拉开距离 × 该系数），范围 5~60 */
   slingPower: number
+  /** 省电模式：空闲 60 秒后暂停漂浮动画并停用常驻毛玻璃 */
+  ecoMode: boolean
+  /** 毛玻璃强度（进度条底板 blur 像素，0=关闭），0~16 默认 4 */
+  frost: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -30,7 +34,9 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   showBubble: true,
   showBalance: true,
   showPeak: true,
-  slingPower: 20
+  slingPower: 20,
+  ecoMode: true,
+  frost: 4
 }
 
 interface Props {
@@ -68,7 +74,7 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
 
   const menuW = 210
   const left = Math.max(8, Math.min(x, window.innerWidth - menuW - 8))
-  const top = Math.max(8, Math.min(y, window.innerHeight - 460))
+  const top = Math.max(8, Math.min(y, window.innerHeight - 540))
 
   const set = (patch: Partial<MenuConfig>) => onChange({ ...config, ...patch })
 
@@ -131,6 +137,22 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
         />
       </div>
       <div className="wg-menu-divider" />
+      <div className="wg-menu-title">
+        毛玻璃强度 <span className="wg-menu-power">{config.frost === 0 ? '关' : `×${config.frost}`}</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={0}
+          max={16}
+          step={1}
+          value={config.frost}
+          onChange={(e) => set({ frost: Number(e.target.value) })}
+          title="进度条底板的毛玻璃模糊强度（0 = 关闭，更省资源；背景透明度联动）"
+        />
+      </div>
+      <div className="wg-menu-divider" />
       <div className="wg-menu-title">显示模块</div>
       <div className="wg-menu-item" onClick={() => set({ showProgress: !config.showProgress })}>
         <span className={`wg-menu-check${config.showProgress ? ' on' : ''}`} /> 上下文进度条
@@ -143,6 +165,9 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ showPeak: !config.showPeak })}>
         <span className={`wg-menu-check${config.showPeak ? ' on' : ''}`} /> 峰谷提醒
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ ecoMode: !config.ecoMode })}>
+        <span className={`wg-menu-check${config.ecoMode ? ' on' : ''}`} /> 省电模式（空闲暂停动画）
       </div>
       <div className="wg-menu-divider" />
       <div className="wg-menu-item" onClick={onResetPosition}>↺ 恢复默认位置</div>

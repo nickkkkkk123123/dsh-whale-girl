@@ -41,7 +41,9 @@ function normalizeConfig(o: unknown): MenuConfig {
     showBubble: any.showBubble !== false,
     showBalance: any.showBalance !== false,
     showPeak: any.showPeak !== false,
-    slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20
+    slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20,
+    ecoMode: any.ecoMode !== false,
+    frost: Number.isFinite(Number(any.frost)) ? Math.min(16, Math.max(0, Math.round(Number(any.frost)))) : 4
   }
 }
 
@@ -77,11 +79,15 @@ export function WhaleWidget() {
   const [config, setConfig] = useState<MenuConfig>(loadLocalConfig)
   // 中键弹弓：线（原位置中心 → 当前中心），null = 未激活
   const [sling, setSling] = useState<{ fx: number; fy: number; tx: number; ty: number } | null>(null)
+  // 省电模式：空闲（挂件无交互）超过 60 秒 = true，暂停漂浮动画/毛玻璃
+  const [ecoIdle, setEcoIdle] = useState(false)
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
   const pressStartRef = useRef<{ x: number; y: number } | null>(null)
   // 中键弹弓状态
   const middleModeRef = useRef(false)
   const slingOriginRef = useRef<{ x: number; y: number } | null>(null)
+  // 省电模式空闲计时器
+  const ecoTimerRef = useRef(0)
   const trackerRef = useRef(new FlingTracker())
   const flingRef = useRef<{ cancel: () => void } | null>(null)
   const bounceTimerRef = useRef(0)
@@ -95,6 +101,23 @@ export function WhaleWidget() {
   useEffect(() => {
     soundRef.current?.setMode(config.soundMode)
   }, [config.soundMode])
+
+  // 省电模式：挂件交互刷新空闲计时，60 秒无交互 → 暂停漂浮动画/停用毛玻璃（.wg-eco）
+  const markActive = useCallback(() => {
+    setEcoIdle(false)
+    window.clearTimeout(ecoTimerRef.current)
+    ecoTimerRef.current = window.setTimeout(() => setEcoIdle(true), 60000)
+  }, [])
+
+  // 省电模式开关变化时（含加载时）启动空闲计时：60 秒无交互 → 暂停动画/毛玻璃；关闭则立即恢复
+  useEffect(() => {
+    if (!config.ecoMode) {
+      window.clearTimeout(ecoTimerRef.current)
+      setEcoIdle(false)
+      return
+    }
+    markActive()
+  }, [config.ecoMode, markActive])
 
   // 彩蛋提示：首次加载 3 秒后用气泡介绍中键弹弓功能（localStorage 记忆，只提示一次）
   useEffect(() => {
@@ -190,6 +213,7 @@ export function WhaleWidget() {
     return () => {
       window.clearTimeout(bounceTimerRef.current)
       window.clearTimeout(petTimerRef.current)
+      window.clearTimeout(ecoTimerRef.current)
       flingRef.current?.cancel()
     }
   }, [])
@@ -284,6 +308,7 @@ export function WhaleWidget() {
     (e: React.PointerEvent) => {
       const el = rootRef.current
       if (!el) return
+      markActive()
       stopFling()
       const rect = el.getBoundingClientRect()
       // 中键：弹弓模式（记录原位置，画连接线；松开时沿原位置→当前位置方向抛掷）
@@ -327,10 +352,11 @@ export function WhaleWidget() {
         // ignore
       }
     },
-    [stopFling, reportEvent]
+    [stopFling, markActive, reportEvent]
   )
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
+    markActive()
     if (!dragRef.current) return
     // 中键弹弓：挂件跟手，更新连接线（原位置中心 → 当前位置中心）
     if (middleModeRef.current) {
@@ -348,7 +374,7 @@ export function WhaleWidget() {
       x: Math.max(0, Math.min(window.innerWidth - WIDGET_W, e.clientX - dragRef.current.dx)),
       y: Math.max(0, Math.min(window.innerHeight - WIDGET_H, e.clientY - dragRef.current.dy))
     })
-  }, [])
+  }, [markActive])
 
   const onPointerUp = useCallback(
     (e: React.PointerEvent) => {
@@ -549,8 +575,15 @@ export function WhaleWidget() {
       <style>{WIDGET_CSS}</style>
       <div
         ref={rootRef}
-        className={`wg-root${dragging ? ' wg-dragging' : ''}${flinging ? ' wg-flinging' : ''}${bounce ? ' wg-bounce' : ''}${bounceAxis === 'x' ? ' wg-squash-x' : ''}${bounceAxis === 'y' ? ' wg-squash-y' : ''}${petted ? ' wg-pet' : ''}${pos.x + WIDGET_W / 2 < window.innerWidth / 2 ? ' wg-flip' : ''}`}
-        style={{ left: pos.x, top: pos.y, transform: pressed ? 'scaleY(0.9)' : undefined }}
+        className={`wg-root${dragging ? ' wg-dragging' : ''}${flinging ? ' wg-flinging' : ''}${bounce ? ' wg-bounce' : ''}${bounceAxis === 'x' ? ' wg-squash-x' : ''}${bounceAxis === 'y' ? ' wg-squash-y' : ''}${petted ? ' wg-pet' : ''}${config.ecoMode && ecoIdle ? ' wg-eco' : ''}${pos.x + WIDGET_W / 2 < window.innerWidth / 2 ? ' wg-flip' : ''}`}
+        style={
+          {
+            left: pos.x,
+            top: pos.y,
+            transform: pressed ? 'scaleY(0.9)' : undefined,
+            '--wg-frost': config.frost
+          } as React.CSSProperties
+        }
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

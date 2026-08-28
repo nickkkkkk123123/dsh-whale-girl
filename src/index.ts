@@ -39,6 +39,10 @@ export interface WidgetConfig {
   showPeak: boolean
   /** 中键弹弓发射力度系数（松手速度 = 拉开距离 × 该系数），范围 5~60 */
   slingPower: number
+  /** 省电模式：空闲 60 秒后暂停漂浮动画并停用常驻毛玻璃（交互立即恢复） */
+  ecoMode: boolean
+  /** 毛玻璃强度（进度条底板 blur 像素，0=关闭，背景透明度联动），0~16 默认 4 */
+  frost: number
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -47,7 +51,9 @@ const DEFAULT_CONFIG: WidgetConfig = {
   showBubble: true,
   showBalance: true,
   showPeak: true,
-  slingPower: 20
+  slingPower: 20,
+  ecoMode: true,
+  frost: 4
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -59,7 +65,9 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     showBubble: o.showBubble !== false,
     showBalance: o.showBalance !== false,
     showPeak: o.showPeak !== false,
-    slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20
+    slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20,
+    ecoMode: o.ecoMode !== false,
+    frost: Number.isFinite(Number(o.frost)) ? Math.min(16, Math.max(0, Math.round(Number(o.frost)))) : 4
   }
 }
 

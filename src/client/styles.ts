@@ -65,11 +65,12 @@ export const WIDGET_CSS = `
   right: 8px;
   bottom: 0;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.82);
+  /* 毛玻璃强度可调（--wg-frost 由挂件根节点注入，0=关闭；默认 4 对应 blur 4px / 底板 0.82） */
+  background: rgba(255, 255, 255, calc(0.94 - var(--wg-frost, 4) * 0.03));
   border: 1px solid rgba(80, 110, 190, 0.25);
   border-radius: 8px;
   padding: 3px 6px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(calc(var(--wg-frost, 4) * 1px));
 }
 .wg-context-head {
   display: flex;
@@ -352,5 +353,13 @@ export const WIDGET_CSS = `
   border: 3.5px solid #4a6cf7;
   box-shadow: 0 1px 5px rgba(30, 50, 120, 0.35);
   cursor: pointer;
+}
+/* 省电模式：空闲后暂停漂浮动画、停用常驻毛玻璃（pointer 交互立即恢复） */
+.wg-eco .wg-img {
+  animation-play-state: paused;
+}
+.wg-eco .wg-context {
+  backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.92);
 }
 `
