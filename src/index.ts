@@ -41,8 +41,10 @@ export interface WidgetConfig {
   slingPower: number
   /** 省电模式：空闲 60 秒后暂停漂浮动画并停用常驻毛玻璃（交互立即恢复） */
   ecoMode: boolean
-  /** 毛玻璃强度（进度条底板 blur 像素，0=关闭，背景透明度联动），0~16 默认 4 */
+  /** 毛玻璃强度（进度条底板 blur 像素，0=关闭），0~16 默认 4 */
   frost: number
+  /** 进度条底板背景不透明度，0.2~1 默认 0.82（越小越透） */
+  panelOpacity: number
   /** 余额预警线（元）：低于该值时气泡提醒充值，0=关闭预警 */
   lowBalance: number
 }
@@ -56,6 +58,7 @@ const DEFAULT_CONFIG: WidgetConfig = {
   slingPower: 20,
   ecoMode: true,
   frost: 4,
+  panelOpacity: 0.82,
   lowBalance: 10
 }
 
@@ -71,6 +74,7 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20,
     ecoMode: o.ecoMode !== false,
     frost: Number.isFinite(Number(o.frost)) ? Math.min(16, Math.max(0, Math.round(Number(o.frost)))) : 4,
+    panelOpacity: Number.isFinite(Number(o.panelOpacity)) ? Math.min(1, Math.max(0.2, Number(o.panelOpacity))) : 0.82,
     lowBalance: Number.isFinite(Number(o.lowBalance)) ? Math.max(0, Number(o.lowBalance)) : 10
   }
 }

@@ -13,6 +13,8 @@ export interface MenuConfig {
   ecoMode: boolean
   /** 毛玻璃强度（进度条底板 blur 像素，0=关闭），0~16 默认 4 */
   frost: number
+  /** 进度条底板背景不透明度，0.2~1 默认 0.82（越小越透） */
+  panelOpacity: number
   /** 余额预警线（元）：低于该值时气泡提醒充值，0=关闭预警 */
   lowBalance: number
 }
@@ -39,6 +41,7 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   slingPower: 20,
   ecoMode: true,
   frost: 4,
+  panelOpacity: 0.82,
   lowBalance: 10
 }
 
@@ -77,7 +80,7 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
 
   const menuW = 210
   const left = Math.max(8, Math.min(x, window.innerWidth - menuW - 8))
-  const top = Math.max(8, Math.min(y, window.innerHeight - 540))
+  const top = Math.max(8, Math.min(y, window.innerHeight - 600))
 
   const set = (patch: Partial<MenuConfig>) => onChange({ ...config, ...patch })
 
@@ -152,7 +155,23 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
           step={1}
           value={config.frost}
           onChange={(e) => set({ frost: Number(e.target.value) })}
-          title="进度条底板的毛玻璃模糊强度（0 = 关闭，更省资源；背景透明度联动）"
+          title="进度条底板的毛玻璃模糊强度（0 = 关闭，更省资源）"
+        />
+      </div>
+      <div className="wg-menu-divider" />
+      <div className="wg-menu-title">
+        底板透明度 <span className="wg-menu-power">{Math.round(config.panelOpacity * 100)}%</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={20}
+          max={100}
+          step={5}
+          value={Math.round(config.panelOpacity * 100)}
+          onChange={(e) => set({ panelOpacity: Number(e.target.value) / 100 })}
+          title="进度条底板的不透明度（越小越透，透出挂件背后的页面内容）"
         />
       </div>
       <div className="wg-menu-divider" />

@@ -44,6 +44,7 @@ function normalizeConfig(o: unknown): MenuConfig {
     slingPower: Number.isFinite(power) ? Math.min(60, Math.max(5, power)) : 20,
     ecoMode: any.ecoMode !== false,
     frost: Number.isFinite(Number(any.frost)) ? Math.min(16, Math.max(0, Math.round(Number(any.frost)))) : 4,
+    panelOpacity: Number.isFinite(Number(any.panelOpacity)) ? Math.min(1, Math.max(0.2, Number(any.panelOpacity))) : 0.82,
     lowBalance: Number.isFinite(Number(any.lowBalance)) ? Math.max(0, Number(any.lowBalance)) : 10
   }
 }
@@ -629,7 +630,8 @@ export function WhaleWidget() {
             left: pos.x,
             top: pos.y,
             transform: pressed ? 'scaleY(0.9)' : undefined,
-            '--wg-frost': config.frost
+            '--wg-frost': config.frost,
+            '--wg-panel-alpha': config.panelOpacity
           } as React.CSSProperties
         }
         onPointerDown={onPointerDown}
