@@ -70,8 +70,13 @@ export function WhaleWidget() {
   const [providers, setProviders] = useState<ProviderRow[] | null>(null)
   const [switching, setSwitching] = useState<string | null>(null)
   const [config, setConfig] = useState<MenuConfig>(loadLocalConfig)
+  // 中键弹弓：线（原位置中心 → 当前中心），null = 未激活
+  const [sling, setSling] = useState<{ fx: number; fy: number; tx: number; ty: number } | null>(null)
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
   const pressStartRef = useRef<{ x: number; y: number } | null>(null)
+  // 中键弹弓状态
+  const middleModeRef = useRef(false)
+  const slingOriginRef = useRef<{ x: number; y: number } | null>(null)
   const trackerRef = useRef(new FlingTracker())
   const flingRef = useRef<{ cancel: () => void } | null>(null)
   const bounceTimerRef = useRef(0)
@@ -250,6 +255,31 @@ export function WhaleWidget() {
       if (!el) return
       stopFling()
       const rect = el.getBoundingClientRect()
+      // 中键：弹弓模式（记录原位置，画连接线；松开时沿原位置→当前位置方向抛掷）
+      if (e.button === 1) {
+        e.preventDefault()
+        e.stopPropagation()
+        const ox = posRef.current.x
+        const oy = posRef.current.y
+        middleModeRef.current = true
+        slingOriginRef.current = { x: ox, y: oy }
+        dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
+        setSling({
+          fx: ox + WIDGET_W / 2,
+          fy: oy + WIDGET_H / 2,
+          tx: ox + WIDGET_W / 2,
+          ty: oy + WIDGET_H / 2
+        })
+        setPressed(true)
+        setDragging(true)
+        soundRef.current?.unlock()
+        try {
+          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+        } catch {
+          // ignore
+        }
+        return
+      }
       dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
       pressStartRef.current = { x: e.clientX, y: e.clientY }
       trackerRef.current.clear()
@@ -271,6 +301,17 @@ export function WhaleWidget() {
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return
+    // 中键弹弓：挂件跟手，更新连接线（原位置中心 → 当前位置中心）
+    if (middleModeRef.current) {
+      const nx = Math.max(0, Math.min(window.innerWidth - WIDGET_W, e.clientX - dragRef.current.dx))
+      const ny = Math.max(0, Math.min(window.innerHeight - WIDGET_H, e.clientY - dragRef.current.dy))
+      setPos({ x: nx, y: ny })
+      const o = slingOriginRef.current
+      if (o) {
+        setSling({ fx: o.x + WIDGET_W / 2, fy: o.y + WIDGET_H / 2, tx: nx + WIDGET_W / 2, ty: ny + WIDGET_H / 2 })
+      }
+      return
+    }
     trackerRef.current.push(e.clientX, e.clientY)
     setPos({
       x: Math.max(0, Math.min(window.innerWidth - WIDGET_W, e.clientX - dragRef.current.dx)),
@@ -280,6 +321,71 @@ export function WhaleWidget() {
 
   const onPointerUp = useCallback(
     (e: React.PointerEvent) => {
+      // 中键弹弓：松开时沿「原位置 → 当前位置」方向赋予动能抛掷
+      if (middleModeRef.current) {
+        middleModeRef.current = false
+        const origin = slingOriginRef.current
+        slingOriginRef.current = null
+        const el = rootRef.current
+        const rect = el?.getBoundingClientRect()
+        dragRef.current = null
+        pressStartRef.current = null
+        setPressed(false)
+        setDragging(false)
+        setSling(null)
+        try {
+          ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+        } catch {
+          // ignore
+        }
+        if (origin && rect) {
+          const fromX = origin.x + WIDGET_W / 2
+          const fromY = origin.y + WIDGET_H / 2
+          const toX = rect.left + WIDGET_W / 2
+          const toY = rect.top + WIDGET_H / 2
+          // 弹弓：松手后弹回「原位置」方向（橡皮筋拉回），与拖动方向相反
+          const dx = fromX - toX
+          const dy = fromY - toY
+          const dist = Math.hypot(dx, dy)
+          if (dist > 10) {
+            // 速度与拉开的距离成正比（弹弓手感），不设上限
+            const speed = dist * 20
+            const vx = (dx / dist) * speed
+            const vy = (dy / dist) * speed
+            setFlinging(true)
+            let bounced = false
+            reportEvent('sling', { vx, vy, dist })
+            flingRef.current = startFling({
+              x: rect.left,
+              y: rect.top,
+              vx,
+              vy,
+              width: WIDGET_W,
+              height: WIDGET_H,
+              onMove: (x, y) => setPos({ x, y }),
+              onBounce: (axis) => {
+                bounced = true
+                reportEvent('bounce', { axis })
+                reportEvent('sound', { kind: 'bounce' })
+                soundRef.current?.bounce()
+                shake()
+                setBounceAxis(axis)
+                window.clearTimeout(bounceTimerRef.current)
+                bounceTimerRef.current = window.setTimeout(() => setBounceAxis(null), 260)
+              },
+              onDone: (x, y) => {
+                flingRef.current = null
+                setFlinging(false)
+                if (!bounced) soundRef.current?.bounce()
+                snap(x, y)
+              }
+            })
+          } else {
+            snap(rect.left, rect.top)
+          }
+        }
+        return
+      }
       const start = pressStartRef.current
       const moved = start !== null && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6
       const vel = trackerRef.current.velocity()
@@ -448,6 +554,70 @@ export function WhaleWidget() {
           />
         )}
       </div>
+      {sling &&
+        (() => {
+          const fx = sling.fx
+          const fy = sling.fy
+          const tx = sling.tx
+          const ty = sling.ty
+          // 水滴连接带：两端圆 + 中间细腰（果冻/拉长的液滴造型）
+          const ang = Math.atan2(ty - fy, tx - fx)
+          const nx = -Math.sin(ang)
+          const ny = Math.cos(ang)
+          const r1 = 11 // 起点圆半径
+          const r2 = 11 // 终点圆半径
+          const waist = 4 // 中间细腰内凹量
+          const a1x = fx + nx * r1, a1y = fy + ny * r1
+          const a2x = fx - nx * r1, a2y = fy - ny * r1
+          const b1x = tx + nx * r2, b1y = ty + ny * r2
+          const b2x = tx - nx * r2, b2y = ty - ny * r2
+          const mx = (fx + tx) / 2, my = (fy + ty) / 2
+          const c1x = mx - nx * waist, c1y = my - ny * waist
+          const c2x = mx + nx * waist, c2y = my + ny * waist
+          const dripPath = `M ${a1x.toFixed(1)} ${a1y.toFixed(1)} Q ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${b1x.toFixed(1)} ${b1y.toFixed(1)} A ${r2} ${r2} 0 0 1 ${b2x.toFixed(1)} ${b2y.toFixed(1)} Q ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${a2x.toFixed(1)} ${a2y.toFixed(1)} A ${r1} ${r1} 0 0 1 ${a1x.toFixed(1)} ${a1y.toFixed(1)} Z`
+          return (
+            <svg
+              className="wg-slingshot"
+              style={{
+                position: 'fixed',
+                left: 0,
+                top: 0,
+                width: '100vw',
+                height: '100vh',
+                pointerEvents: 'none',
+                zIndex: 2147483646,
+                overflow: 'visible'
+              }}
+            >
+              <defs>
+                <linearGradient id="wg-drip-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(120,170,255,0.9)" />
+                  <stop offset="100%" stopColor="rgba(74,108,247,0.9)" />
+                </linearGradient>
+                <filter id="wg-drip-glow" x="-40%" y="-40%" width="180%" height="180%">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              {/* 柔光层 */}
+              <path
+                d={dripPath}
+                fill="rgba(74,108,247,0.3)"
+                filter="url(#wg-drip-glow)"
+              />
+              {/* 主水滴连接带 */}
+              <path d={dripPath} fill="url(#wg-drip-grad)" />
+              {/* 两端圆点（发光核心，统一 DeepSeek 蓝） */}
+              <circle cx={fx} cy={fy} r={7} fill="rgba(120,170,255,0.9)" filter="url(#wg-drip-glow)" />
+              <circle cx={tx} cy={ty} r={7} fill="rgba(74,108,247,0.9)" filter="url(#wg-drip-glow)" />
+              <circle cx={fx} cy={fy} r={3} fill="#fff" />
+              <circle cx={tx} cy={ty} r={3} fill="#fff" />
+            </svg>
+          )
+        })()}
       {menu && (
         <WidgetMenu
           x={menu.x}
