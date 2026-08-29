@@ -25,14 +25,14 @@ export const WIDGET_CSS = `
   animation: wg-squash-y 240ms ease-out;
 }
 @keyframes wg-squash-x {
-  0% { transform: scaleX(1.35) scaleY(0.7); }
-  60% { transform: scaleX(0.6) scaleY(1.35); }
-  100% { transform: scaleX(1) scaleY(1); }
+  0% { transform: scaleX(calc(1.35 * var(--wg-flip, 1))) scaleY(0.7); }
+  60% { transform: scaleX(calc(0.6 * var(--wg-flip, 1))) scaleY(1.35); }
+  100% { transform: scaleX(var(--wg-flip, 1)) scaleY(1); }
 }
 @keyframes wg-squash-y {
-  0% { transform: scaleX(0.7) scaleY(1.35); }
-  60% { transform: scaleX(1.35) scaleY(0.6); }
-  100% { transform: scaleX(1) scaleY(1); }
+  0% { transform: scaleX(calc(0.7 * var(--wg-flip, 1))) scaleY(1.35); }
+  60% { transform: scaleX(calc(1.35 * var(--wg-flip, 1))) scaleY(0.6); }
+  100% { transform: scaleX(var(--wg-flip, 1)) scaleY(1); }
 }
 .wg-root:active { cursor: grabbing; }
 /* 工作状态徽章：Agent 思考/完成时挂在头顶的胶囊标签 */
