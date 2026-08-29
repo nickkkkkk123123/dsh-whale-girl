@@ -47,6 +47,8 @@ export interface WidgetConfig {
   panelOpacity: number
   /** 余额预警线（元）：低于该值时气泡提醒充值，0=关闭预警 */
   lowBalance: number
+  /** 是否显示 Agent 工作状态徽章（思考中/搞定啦）与过渡台词 */
+  showWorkState: boolean
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -59,7 +61,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   ecoMode: true,
   frost: 4,
   panelOpacity: 0.82,
-  lowBalance: 10
+  lowBalance: 10,
+  showWorkState: true
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -75,7 +78,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     ecoMode: o.ecoMode !== false,
     frost: Number.isFinite(Number(o.frost)) ? Math.min(16, Math.max(0, Math.round(Number(o.frost)))) : 4,
     panelOpacity: Number.isFinite(Number(o.panelOpacity)) ? Math.min(1, Math.max(0.2, Number(o.panelOpacity))) : 0.82,
-    lowBalance: Number.isFinite(Number(o.lowBalance)) ? Math.max(0, Number(o.lowBalance)) : 10
+    lowBalance: Number.isFinite(Number(o.lowBalance)) ? Math.max(0, Number(o.lowBalance)) : 10,
+    showWorkState: o.showWorkState !== false
   }
 }
 
@@ -196,8 +200,33 @@ export function apply(ctx: any) {
     if (session) currentSession = session
   })
 
+  // 工作状态机（轻量版）：thinking → done → idle。done 判定复用 buildState 的 measure 缓存（60 秒节奏），
+  // 不新增任何 measure 调用（此前 10 秒一次的全量 measure 拖慢宿主，曾致渲染器启动超时，已回滚）
+  let workState: 'idle' | 'thinking' | 'done' = 'idle'
+  let workStateSince = Date.now()
+  let lastGrowthTotal = -1
+  let lastGrowthAt = 0
+  let lastMeasureTotal = 0
+  function setWorkState(s: 'idle' | 'thinking' | 'done'): void {
+    if (workState === s) return
+    workState = s
+    workStateSince = Date.now()
+    if (s === 'thinking') {
+      lastGrowthTotal = -1
+      lastGrowthAt = Date.now()
+    }
+    diag(`workstate: ${s}`)
+  }
+  // 用户发消息 → 思考中（事件名沿用 pelican 生态验证过的用法；try 包裹防宿主版本差异）
+  try {
+    ctx.on('agent/inbox/inserted', () => setWorkState('thinking'))
+  } catch {
+    diag('workstate: agent/inbox/inserted 事件不可用')
+  }
+
   // 每轮消耗：turn 即将结束时用 tokenMeter 测当前会话 token，估算本轮成本 + 记入当前小时桶
   ctx.on('agent/turn-stopping', (payload: any) => {
+    setWorkState('done')
     try {
       const agent = payload?.agent
       const session =
@@ -240,6 +269,16 @@ export function apply(ctx: any) {
         }
         // surfaceTokens = 会话表面稳定占用（对话结束不清零）；totalTokens = 请求压力（对话结束归 0）
         contextTokens = Number(m?.surfaceTokens ?? m?.totalTokens ?? m?.tokens ?? m?.total ?? 0)
+        // 工作状态机：缓存本次 measure 总量，用于 done 判定（60 秒节奏，零额外成本）
+        lastMeasureTotal = Number(m?.totalTokens ?? m?.tokens ?? m?.total ?? 0)
+        if (workState === 'thinking') {
+          if (lastMeasureTotal !== lastGrowthTotal) {
+            lastGrowthTotal = lastMeasureTotal
+            lastGrowthAt = Date.now()
+          } else if (lastGrowthTotal >= 0 && Date.now() - lastGrowthAt > 50000) {
+            setWorkState('done')
+          }
+        }
       } else {
         diag(`measure: tm=${!!tm} session=${!!session}`)
       }
@@ -274,6 +313,22 @@ export function apply(ctx: any) {
           'Cache-Control': 'no-store'
         })
         res.end(JSON.stringify(buildState()))
+      }
+    })
+    // 工作状态端点：done 30 秒、thinking 10 分钟惰性过期归 idle
+    server.register({
+      kind: 'exact',
+      path: '/dsh-whale-girl/api/workstate',
+      handler: (req: unknown, res: any) => {
+        let s = workState
+        const age = Date.now() - workStateSince
+        if (s === 'done' && age > 30000) s = 'idle'
+        if (s === 'thinking' && age > 600000) s = 'idle'
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        })
+        res.end(JSON.stringify({ state: s, since: workStateSince }))
       }
     })
     // JSONP 端点：client 用动态 <script> 加载（script 资源请求与 client.js 同通道，可透过 webserver 认证；普通 fetch 会被 403 拦）
@@ -426,6 +481,22 @@ export function apply(ctx: any) {
   }
   pull()
   setInterval(pull, 60000)
+  // 工作状态：5 秒轮询并广播给挂件（读取轻量端点，不触发 measure）
+  var pullWork = function () {
+    try {
+      fetch('/dsh-whale-girl/api/workstate', { cache: 'no-store' })
+        .then(function (r) { return r.json() })
+        .then(function (d) {
+          if (d && d.state) {
+            window.__wgWorkState = d
+            window.postMessage({ __wgWorkState: d }, '*')
+          }
+        })
+        .catch(function () {})
+    } catch (e) {}
+  }
+  pullWork()
+  setInterval(pullWork, 5000)
   // 交互诊断回流：slots 挂件触发交互时 postMessage 事件，此处接收并上报宿主写日志
   window.addEventListener('message', function (ev) {
     var d = ev.data

@@ -45,7 +45,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     ecoMode: any.ecoMode !== false,
     frost: Number.isFinite(Number(any.frost)) ? Math.min(16, Math.max(0, Math.round(Number(any.frost)))) : 4,
     panelOpacity: Number.isFinite(Number(any.panelOpacity)) ? Math.min(1, Math.max(0.2, Number(any.panelOpacity))) : 0.82,
-    lowBalance: Number.isFinite(Number(any.lowBalance)) ? Math.max(0, Number(any.lowBalance)) : 10
+    lowBalance: Number.isFinite(Number(any.lowBalance)) ? Math.max(0, Number(any.lowBalance)) : 10,
+    showWorkState: any.showWorkState !== false
   }
 }
 
@@ -108,6 +109,10 @@ export function WhaleWidget() {
   useEffect(() => {
     soundRef.current?.setMode(config.soundMode)
   }, [config.soundMode])
+
+  // Agent 工作状态（thinking/done/idle）：由桥接的 workstate 广播驱动
+  const [workState, setWorkState] = useState<'idle' | 'thinking' | 'done'>('idle')
+  const prevWorkRef = useRef<'idle' | 'thinking' | 'done'>('idle')
 
   // 省电模式：挂件交互刷新空闲计时，60 秒无交互 → 暂停漂浮动画/停用毛玻璃（.wg-eco）
   const markActive = useCallback(() => {
@@ -352,6 +357,37 @@ export function WhaleWidget() {
       // ignore
     }
   }, [])
+
+  // Agent 工作状态：桥接 5 秒轮询广播（同窗口场景直接读初始值）
+  useEffect(() => {
+    const onWork = (e: MessageEvent) => {
+      const d = (e.data || {}) as { __wgWorkState?: { state?: 'idle' | 'thinking' | 'done' } }
+      if (d.__wgWorkState?.state) setWorkState(d.__wgWorkState.state)
+    }
+    window.addEventListener('message', onWork)
+    const w = window as unknown as { __wgWorkState?: { state?: 'idle' | 'thinking' | 'done' } }
+    if (w.__wgWorkState?.state) setWorkState(w.__wgWorkState.state)
+    return () => window.removeEventListener('message', onWork)
+  }, [])
+
+  // 状态过渡台词与庆祝：进入 thinking → 「让我想想…」；进入 done → 「搞定啦」+ 摸头动画 + 音效
+  useEffect(() => {
+    const prev = prevWorkRef.current
+    if (prev === workState) return
+    prevWorkRef.current = workState
+    if (workState === 'thinking' && config.showBubble && config.showWorkState) {
+      setBubble('让我想想…')
+    }
+    if (workState === 'done' && config.showWorkState) {
+      if (config.showBubble) setBubble('任务搞定啦！🎉')
+      setPetted(true)
+      setPetKey((k) => k + 1)
+      window.clearTimeout(petTimerRef.current)
+      petTimerRef.current = window.setTimeout(() => setPetted(false), 260)
+      soundRef.current?.bounce()
+      reportEvent('workstate', { state: 'done' })
+    }
+  }, [workState, config.showBubble, config.showWorkState, reportEvent])
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -640,6 +676,11 @@ export function WhaleWidget() {
         onContextMenu={onContextMenu}
         data-pressed={pressed}
       >
+        {config.showWorkState && workState !== 'idle' && (
+          <div className={`wg-workstate${workState === 'done' ? ' wg-ws-done' : ''}`} key={workState}>
+            {workState === 'thinking' ? '思考中…' : '搞定啦！'}
+          </div>
+        )}
         <img className="wg-img" src={imgSrc || '/dsh-whale-girl/whale-girl.png'} alt="鲸鱼娘" draggable={false} />
         {petted && (
           <div className="wg-rua" key={petKey}>

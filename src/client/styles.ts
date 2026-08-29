@@ -35,6 +35,26 @@ export const WIDGET_CSS = `
   100% { transform: scaleX(1) scaleY(1); }
 }
 .wg-root:active { cursor: grabbing; }
+/* 工作状态徽章：Agent 思考/完成时挂在头顶的胶囊标签 */
+.wg-workstate {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  background: rgba(74, 108, 247, 0.92);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 9px;
+  z-index: 3;
+  box-shadow: 0 2px 8px rgba(30, 50, 120, 0.28);
+  animation: wg-pop 180ms ease-out;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.wg-workstate.wg-ws-done {
+  background: #2f9d5f;
+}
 .wg-img {
   width: 100%;
   height: 76%;

@@ -17,6 +17,8 @@ export interface MenuConfig {
   panelOpacity: number
   /** 余额预警线（元）：低于该值时气泡提醒充值，0=关闭预警 */
   lowBalance: number
+  /** 是否显示 Agent 工作状态徽章与过渡台词 */
+  showWorkState: boolean
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -42,7 +44,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   ecoMode: true,
   frost: 4,
   panelOpacity: 0.82,
-  lowBalance: 10
+  lowBalance: 10,
+  showWorkState: true
 }
 
 interface Props {
@@ -190,6 +193,9 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ ecoMode: !config.ecoMode })}>
         <span className={`wg-menu-check${config.ecoMode ? ' on' : ''}`} /> 省电模式（空闲暂停动画）
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ showWorkState: !config.showWorkState })}>
+        <span className={`wg-menu-check${config.showWorkState ? ' on' : ''}`} /> 工作状态徽章
       </div>
       <div className="wg-menu-divider" />
       <div className="wg-menu-item" onClick={onResetPosition}>↺ 恢复默认位置</div>
