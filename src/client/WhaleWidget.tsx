@@ -674,14 +674,16 @@ export function WhaleWidget() {
     // 拖拽角色撞到信息面板：角色被挡回（沿面板中心-角色中心法线推到面板外，不能压穿）
     const ob = __wgInfoGlobal
     if (ob && nx < ob.x + ob.w && nx + WIDGET_W > ob.x && ny < ob.y + ob.h && ny + WIDGET_H > ob.y) {
-      const ccx = nx + WIDGET_W / 2
-      const ccy = ny + WIDGET_H / 2
-      const ocx = ob.x + ob.w / 2
-      const ocy = ob.y + ob.h / 2
-      const ang = Math.atan2(ccy - ocy, ccx - ocx)
-      const d = Math.max(ob.w, ob.h) / 2 + Math.max(WIDGET_W, WIDGET_H) / 2 + 2
-      nx = Math.max(0, Math.min(window.innerWidth - WIDGET_W, ocx + Math.cos(ang) * d))
-      ny = Math.max(0, Math.min(window.innerHeight - WIDGET_H, ocy + Math.sin(ang) * d))
+      // 最小穿透轴推出：角色被挡在面板一侧，沿另一轴可滑动（避免来回抽搐）
+      const overlapW = Math.min(nx + WIDGET_W - ob.x, ob.x + ob.w - nx)
+      const overlapH = Math.min(ny + WIDGET_H - ob.y, ob.y + ob.h - ny)
+      if (overlapW < overlapH) {
+        nx = nx < ob.x ? ob.x - WIDGET_W : ob.x + ob.w
+      } else {
+        ny = ny < ob.y ? ob.y - WIDGET_H : ob.y + ob.h
+      }
+      nx = Math.max(0, Math.min(window.innerWidth - WIDGET_W, nx))
+      ny = Math.max(0, Math.min(window.innerHeight - WIDGET_H, ny))
     }
     setPos({ x: nx, y: ny })
   }, [markActive])
