@@ -7,7 +7,8 @@ export const MODEL_LINES = [
   '我要开始写了。',
   '我这次真的要开始写了。',
   '我去吃饭，测完告诉我就行。',
-  '先睡了。'
+  '先睡了。',
+  '太好了，我居然思考了！'
 ]
 
 export const TSUNDERE_LINES = [
