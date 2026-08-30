@@ -117,10 +117,14 @@ function loadLocalConfig(): MenuConfig {
 
 export function WhaleWidget() {
   const rootRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ x: number; y: number }>(() => ({
-    x: Math.max(8, window.innerWidth - WIDGET_W - 8),
-    y: Math.max(8, window.innerHeight - WIDGET_H - INFO_H - 42)
-  }))
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    const w = WIDGET_W * config.widgetScale
+    const h = WIDGET_H * config.widgetScale
+    return {
+      x: Math.max(8, window.innerWidth - w - 8),
+      y: Math.max(8, window.innerHeight - h - INFO_H - 42)
+    }
+  })
   // 信息面板：独立窗口（默认跟随角色；距离超阈值或直接拖拽则脱离）
   const [infoPos] = useState<{ x: number; y: number }>(() => {
     const rw = window.innerWidth
@@ -476,7 +480,7 @@ export function WhaleWidget() {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [config.showInfo, config.followThreshold, workState, config.pauseOnThinking])
+  }, [config.showInfo, config.followThreshold, workState, config.pauseOnThinking, config.infoScale, config.linkScale, config.widgetScale])
 
   // 右键菜单
   const onContextMenu = useCallback((e: React.MouseEvent) => {
@@ -578,7 +582,7 @@ export function WhaleWidget() {
         }
       }
     },
-    []
+    [config.infoScale, config.linkScale, config.widgetScale]
   )
   const getObstacle = useCallback(() => __wgInfoGlobal, [])
   const handleObstacleHit = useCallback((invx: number, invy: number) => {
@@ -634,12 +638,14 @@ export function WhaleWidget() {
   }, [providers, switching])
 
   const resetPosition = useCallback(() => {
+    const w = WIDGET_W * config.widgetScale
+    const h = WIDGET_H * config.widgetScale
     setPos({
-      x: Math.max(8, window.innerWidth - WIDGET_W - 8),
-      y: Math.max(8, window.innerHeight - WIDGET_H - INFO_H - 42)
+      x: Math.max(8, window.innerWidth - w - 8),
+      y: Math.max(8, window.innerHeight - h - INFO_H - 42)
     })
     setMenu(null)
-  }, [])
+  }, [config.widgetScale])
 
   const stopFling = useCallback(() => {
     if (flingRef.current) {
