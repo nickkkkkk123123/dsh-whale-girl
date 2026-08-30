@@ -50,7 +50,7 @@ function circleRectHit(rx: number, ry: number, rw: number, rh: number, cx: numbe
   return dx * dx + dy * dy <= cr * cr
 }
 /** 面板矩形与角色圆碰撞时的法线（圆中心 → 面板最近点方向 = 面板推开方向）；null=不碰。 */
-function panelRoleNormal(px: number, py: number, pW: number, pH: number, cx: number, cy: number, cr: number): { x: number; y: number } | null {
+function panelRoleNormal(px: number, py: number, pW: number, pH: number, cx: number, cy: number, cr: number): { x: number; y: number; depth: number } | null {
   const qx = Math.max(px, Math.min(cx, px + pW))
   const qy = Math.max(py, Math.min(cy, py + pH))
   let nx = qx - cx
@@ -62,7 +62,7 @@ function panelRoleNormal(px: number, py: number, pW: number, pH: number, cx: num
     ny = cy < py + pH / 2 ? -1 : 1
   }
   const d = Math.hypot(nx, ny) || 1
-  return { x: nx / d, y: ny / d }
+  return { x: nx / d, y: ny / d, depth: cr - d }
 }
 
 function normalizeConfig(o: unknown): MenuConfig {
@@ -357,21 +357,8 @@ export function WhaleWidget() {
           infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
           freeStartRef.current = now
         } else {
-          // 跟随时：角色（圆）压到面板 → 沿最近点法线推出并弹开
-          const ip = infoPosRef.current
-          const n = panelRoleNormal(ip.x, ip.y, INFO_W, INFO_H, roleCx, roleCy, roleR)
-          if (n) {
-            const half = Math.max(INFO_W, INFO_H) / 2
-            infoModeRef.current = 'free'
-            infoPosRef.current = {
-              x: cX(roleCx + n.x * (roleR + half + 4)),
-              y: cY(roleCy + n.y * (roleR + half + 4))
-            }
-            infoVelRef.current = { x: n.x * 5, y: n.y * 5 }
-            freeStartRef.current = now
-          } else {
-            infoPosRef.current = { x: nx, y: ny }
-          }
+          // 跟随时：面板贴角色下方，角色撞面板由甩抛物理(fling)处理（角色反弹+面板动量），这里不主动把面板弹开/瞬移
+          infoPosRef.current = { x: nx, y: ny }
         }
       } else if (infoModeRef.current === 'free') {
         // 用户正在直接拖动信息面板 → 交给 onInfoMove，不做惯性
@@ -388,12 +375,11 @@ export function WhaleWidget() {
           if (infoPosRef.current.x > vw - INFO_W - 8) { infoPosRef.current.x = vw - INFO_W - 8; infoVelRef.current.x = -Math.abs(infoVelRef.current.x) * 0.8 }
           if (infoPosRef.current.y < 8) { infoPosRef.current.y = 8; infoVelRef.current.y = Math.abs(infoVelRef.current.y) * 0.8 }
           if (infoPosRef.current.y > vh - INFO_H - 8) { infoPosRef.current.y = vh - INFO_H - 8; infoVelRef.current.y = -Math.abs(infoVelRef.current.y) * 0.8 }
-          // 与角色（圆）碰撞 → 沿最近点法线推出并反射速度
+          // 与角色（圆）碰撞：沿法线推离**穿透深度**（平滑、不瞬移到固定位置）并反射速度
           const n = panelRoleNormal(infoPosRef.current.x, infoPosRef.current.y, INFO_W, INFO_H, roleCx, roleCy, roleR)
           if (n) {
-            const half = Math.max(INFO_W, INFO_H) / 2
-            infoPosRef.current.x = cX(roleCx + n.x * (roleR + half + 4))
-            infoPosRef.current.y = cY(roleCy + n.y * (roleR + half + 4))
+            infoPosRef.current.x = cX(infoPosRef.current.x + n.x * (n.depth + 2))
+            infoPosRef.current.y = cY(infoPosRef.current.y + n.y * (n.depth + 2))
             const dot = infoVelRef.current.x * n.x + infoVelRef.current.y * n.y
             if (dot < 0) {
               infoVelRef.current = { x: infoVelRef.current.x - 2 * dot * n.x, y: infoVelRef.current.y - 2 * dot * n.y }
