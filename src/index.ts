@@ -49,6 +49,8 @@ export interface WidgetConfig {
   lowBalance: number
   /** 是否显示 Agent 工作状态徽章（思考中/搞定啦）与过渡台词 */
   showWorkState: boolean
+  /** 实时余额刷新：开启后余额/用量按约 10 秒刷新（默认 60 秒，比 whale-widget 更实时） */
+  realtimeBalance: boolean
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -62,7 +64,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   frost: 4,
   panelOpacity: 0.82,
   lowBalance: 10,
-  showWorkState: true
+  showWorkState: true,
+  realtimeBalance: false
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -79,7 +82,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     frost: Number.isFinite(Number(o.frost)) ? Math.min(16, Math.max(0, Math.round(Number(o.frost)))) : 4,
     panelOpacity: Number.isFinite(Number(o.panelOpacity)) ? Math.min(1, Math.max(0.2, Number(o.panelOpacity))) : 0.82,
     lowBalance: Number.isFinite(Number(o.lowBalance)) ? Math.max(0, Number(o.lowBalance)) : 10,
-    showWorkState: o.showWorkState !== false
+    showWorkState: o.showWorkState !== false,
+    realtimeBalance: o.realtimeBalance === true
   }
 }
 
@@ -190,10 +194,15 @@ export function apply(ctx: any) {
 
   void refreshBalance()
 
-  const timer = ctx.get('timer')
-  if (timer) {
-    timer.interval(refreshBalance, 60000)
+  // 余额刷新：按「实时令牌」配置决定间隔（60s / 10s），自调度使切换即时生效（无需重启）
+  const scheduleBalance = () => {
+    const ms = widgetConfig.realtimeBalance ? 10000 : 60000
+    setTimeout(() => {
+      void refreshBalance()
+      scheduleBalance()
+    }, ms)
   }
+  scheduleBalance()
 
   // 事件流：任意会话事件都更新当前活跃会话引用（whale-widget 同款方式，重启后会话恢复也能拿到）
   ctx.on('session/event', (session: any) => {
@@ -298,7 +307,8 @@ export function apply(ctx: any) {
       contextTokens,
       contextLimit: DEFAULT_CONTEXT_LIMIT,
       lastTurnCost,
-      peakLow: peak
+      peakLow: peak,
+      refreshMs: widgetConfig.realtimeBalance ? 10000 : 60000
     }
   }
 
@@ -466,6 +476,7 @@ export function apply(ctx: any) {
     const BRIDGE_JS = `(function () {
   if (window.__wgBridge) return
   window.__wgBridge = true
+  var nextDelay = 60000
   var pull = function () {
     try {
       fetch('/dsh-whale-girl/api/state', { cache: 'no-store' })
@@ -475,12 +486,14 @@ export function apply(ctx: any) {
             window.__wgData = d
             window.postMessage({ __wgData: d }, '*')
           }
+          if (d && typeof d.refreshMs === 'number') nextDelay = d.refreshMs
+          setTimeout(pull, nextDelay)
         })
-        .catch(function () {})
-    } catch (e) {}
+        .catch(function () { setTimeout(pull, nextDelay) })
+    } catch (e) { setTimeout(pull, nextDelay) }
   }
   pull()
-  setInterval(pull, 60000)
+  // 注：pull 自调度，间隔跟随 /api/state 的 refreshMs（实时切换即时生效）
   // 工作状态：5 秒轮询并广播给挂件（读取轻量端点，不触发 measure）
   var pullWork = function () {
     try {

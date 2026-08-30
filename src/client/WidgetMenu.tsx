@@ -19,6 +19,8 @@ export interface MenuConfig {
   lowBalance: number
   /** 是否显示 Agent 工作状态徽章与过渡台词 */
   showWorkState: boolean
+  /** 实时余额刷新（10 秒，默认关闭用 60 秒） */
+  realtimeBalance: boolean
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -45,7 +47,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   frost: 4,
   panelOpacity: 0.82,
   lowBalance: 10,
-  showWorkState: true
+  showWorkState: true,
+  realtimeBalance: false
 }
 
 interface Props {
@@ -187,6 +190,9 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ showBalance: !config.showBalance })}>
         <span className={`wg-menu-check${config.showBalance ? ' on' : ''}`} /> 余额信息
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ realtimeBalance: !config.realtimeBalance })}>
+        <span className={`wg-menu-check${config.realtimeBalance ? ' on' : ''}`} /> 实时余额刷新(10秒)
       </div>
       <div className="wg-menu-item" onClick={() => set({ showPeak: !config.showPeak })}>
         <span className={`wg-menu-check${config.showPeak ? ' on' : ''}`} /> 峰谷提醒

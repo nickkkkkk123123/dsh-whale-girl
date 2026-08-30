@@ -46,7 +46,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     frost: Number.isFinite(Number(any.frost)) ? Math.min(16, Math.max(0, Math.round(Number(any.frost)))) : 4,
     panelOpacity: Number.isFinite(Number(any.panelOpacity)) ? Math.min(1, Math.max(0.2, Number(any.panelOpacity))) : 0.82,
     lowBalance: Number.isFinite(Number(any.lowBalance)) ? Math.max(0, Number(any.lowBalance)) : 10,
-    showWorkState: any.showWorkState !== false
+    showWorkState: any.showWorkState !== false,
+    realtimeBalance: any.realtimeBalance === true
   }
 }
 
