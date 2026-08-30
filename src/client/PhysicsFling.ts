@@ -113,8 +113,14 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
         vx = vx - 2 * dot * nx
         vy = vy - 2 * dot * ny
       }
-      x = ocx + nx * (ob.w / 2 + opts.width / 2 + 2)
-      y = ocy + ny * (ob.h / 2 + opts.height / 2 + 2)
+      // 最小穿透轴推出：角色被挡在面板一侧，避免瞬移到固定位置
+      const overlapW = Math.min(x + opts.width - ob.x, ob.x + ob.w - x)
+      const overlapH = Math.min(y + opts.height - ob.y, ob.y + ob.h - y)
+      if (overlapW < overlapH) {
+        x = x < ob.x ? ob.x - opts.width : ob.x + ob.w
+      } else {
+        y = y < ob.y ? ob.y - opts.height : ob.y + ob.h
+      }
       opts.onObstacleHit?.(invx, invy)
     }
 
