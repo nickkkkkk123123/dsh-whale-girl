@@ -404,7 +404,8 @@ export const WIDGET_CSS = `
 .wg-info {
   width: 132px;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.36);
+  -webkit-backdrop-filter: blur(var(--wg-frost, 0px));
   backdrop-filter: blur(var(--wg-frost, 0px));
   border: 1px solid rgba(74, 108, 247, 0.28);
   border-radius: 10px;

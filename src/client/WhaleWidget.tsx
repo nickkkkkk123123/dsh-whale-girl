@@ -400,15 +400,40 @@ export function WhaleWidget() {
             } else {
               infoVelRef.current = { x: -infoVelRef.current.x, y: -infoVelRef.current.y }
             }
-            // 对称：角色也被面板撞开（角色非拖拽/甩抛中才被推开一点）
+            // 对称：角色静止被面板撞到 → 角色进入甩抛（被撞飞，带面板动量）
             if (!dragging && !flinging) {
               const pvx = infoVelRef.current.x
               const pvy = infoVelRef.current.y
-              const pvl = Math.hypot(pvx, pvy) || 1
-              setPos({
-                x: Math.max(8, Math.min(window.innerWidth - WIDGET_W - 8, p.x + (pvx / pvl) * 6)),
-                y: Math.max(8, Math.min(window.innerHeight - WIDGET_H - 8, p.y + (pvy / pvl) * 6))
-              })
+              if (Math.hypot(pvx, pvy) > 60) {
+                setFlinging(true)
+                flingRef.current?.cancel()
+                let bounced = false
+                flingRef.current = startFling({
+                  x: p.x,
+                  y: p.y,
+                  vx: pvx * 0.7,
+                  vy: pvy * 0.7,
+                  width: WIDGET_W,
+                  height: WIDGET_H,
+                  getObstacle,
+                  onObstacleHit: handleObstacleHit,
+                  onMove: (x, y) => setPos({ x, y }),
+                  onBounce: (axis) => {
+                    bounced = true
+                    soundRef.current?.bounce()
+                    shake()
+                    setBounceAxis(axis)
+                    window.clearTimeout(bounceTimerRef.current)
+                    bounceTimerRef.current = window.setTimeout(() => setBounceAxis(null), 260)
+                  },
+                  onDone: (x, y) => {
+                    flingRef.current = null
+                    setFlinging(false)
+                    if (!bounced) soundRef.current?.bounce()
+                    snap(x, y)
+                  }
+                })
+              }
             }
           }
           if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
