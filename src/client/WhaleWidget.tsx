@@ -34,6 +34,11 @@ const WIDGET_W = 170
 const WIDGET_H = 180
 /** 松手速度（px/s）超过此值进入甩抛弹跳模式。 */
 const FLING_SPEED = 800
+/** 信息面板（独立窗口）尺寸。 */
+const INFO_W = 142
+const INFO_H = 66
+/** 信息面板独立状态维持时长（ms），之后尝试回归。 */
+const FREE_MS = 4000
 
 function normalizeConfig(o: unknown): MenuConfig {
   const any = (o && typeof o === 'object' ? o : {}) as Record<string, unknown>
@@ -51,7 +56,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     lowBalance: Number.isFinite(Number(any.lowBalance)) ? Math.max(0, Number(any.lowBalance)) : 10,
     showWorkState: any.showWorkState !== false,
     realtimeBalance: any.realtimeBalance === true,
-    showInfo: any.showInfo !== false
+    showInfo: any.showInfo !== false,
+    followThreshold: Number.isFinite(Number(any.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(any.followThreshold)))) : 180
   }
 }
 
@@ -71,6 +77,12 @@ export function WhaleWidget() {
     x: Math.max(0, window.innerWidth - WIDGET_W - 8),
     y: Math.max(0, window.innerHeight - WIDGET_H - 8)
   }))
+  // 信息面板：独立窗口（默认跟随角色；距离超阈值或直接拖拽则脱离）
+  const [infoPos, setInfoPos] = useState<{ x: number; y: number }>(() => ({
+    x: window.innerWidth - 170,
+    y: window.innerHeight - 250
+  }))
+  const [, setInfoMode] = useState<'follow' | 'free' | 'returning'>('follow')
   const [pressed, setPressed] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [flinging, setFlinging] = useState(false)
@@ -102,6 +114,12 @@ export function WhaleWidget() {
   // 空闲彩蛋计时器
   const idleEggTimerRef = useRef(0)
   const trackerRef = useRef(new FlingTracker())
+  const infoPosRef = useRef(infoPos)
+  const infoModeRef = useRef<'follow' | 'free' | 'returning'>('follow')
+  const infoVelRef = useRef({ x: 0, y: 0 })
+  const freeStartRef = useRef(0)
+  const lastRolePosRef = useRef({ x: 0, y: 0 })
+  const infoDragRef = useRef<{ dx: number; dy: number } | null>(null)
   const flingRef = useRef<{ cancel: () => void } | null>(null)
   const bounceTimerRef = useRef(0)
   const petTimerRef = useRef(0)
@@ -277,6 +295,83 @@ export function WhaleWidget() {
     }
   }, [])
 
+  // 信息面板物理：滞后跟随角色；距离超阈值→独立（自由惯性+撞边界/角色反弹+倒计时）；超时→回归（角色静止则跟随）
+  useEffect(() => {
+    if (!config.showInfo) return
+    let raf = 0
+    let last = performance.now()
+    const step = (now: number) => {
+      const dt = Math.max(0.001, Math.min(0.05, (now - last) / 1000))
+      last = now
+      const p = posRef.current
+      const anchor = { x: p.x + WIDGET_W / 2 - INFO_W / 2, y: p.y + WIDGET_H + 12 }
+      if (infoModeRef.current === 'follow') {
+        const k = 0.12
+        const nx = infoPosRef.current.x + (anchor.x - infoPosRef.current.x) * k
+        const ny = infoPosRef.current.y + (anchor.y - infoPosRef.current.y) * k
+        const dist = Math.hypot(anchor.x - nx, anchor.y - ny)
+        if (dist > config.followThreshold) {
+          infoModeRef.current = 'free'
+          infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
+          freeStartRef.current = now
+        } else {
+          infoPosRef.current = { x: nx, y: ny }
+        }
+      } else if (infoModeRef.current === 'free') {
+        // 用户正在直接拖动信息面板 → 交给 onInfoMove，不做惯性
+        if (infoDragRef.current) {
+          // 保持独立：拖拽中，位置由 onInfoMove 控制
+        } else {
+          const q = infoPosRef.current
+          const v = infoVelRef.current
+          infoPosRef.current = { x: q.x + v.x * dt, y: q.y + v.y * dt }
+          infoVelRef.current = { x: v.x * 0.985, y: v.y * 0.985 }
+          const vw = window.innerWidth
+          const vh = window.innerHeight
+          if (infoPosRef.current.x < 8) { infoPosRef.current.x = 8; infoVelRef.current.x = Math.abs(infoVelRef.current.x) * 0.8 }
+          if (infoPosRef.current.x > vw - INFO_W - 8) { infoPosRef.current.x = vw - INFO_W - 8; infoVelRef.current.x = -Math.abs(infoVelRef.current.x) * 0.8 }
+          if (infoPosRef.current.y < 8) { infoPosRef.current.y = 8; infoVelRef.current.y = Math.abs(infoVelRef.current.y) * 0.8 }
+          if (infoPosRef.current.y > vh - INFO_H - 8) { infoPosRef.current.y = vh - INFO_H - 8; infoVelRef.current.y = -Math.abs(infoVelRef.current.y) * 0.8 }
+          // 与角色矩形碰撞 → 反弹推出
+          if (
+            infoPosRef.current.x < p.x + WIDGET_W && infoPosRef.current.x + INFO_W > p.x &&
+            infoPosRef.current.y < p.y + WIDGET_H && infoPosRef.current.y + INFO_H > p.y
+          ) {
+            const cx = infoPosRef.current.x + INFO_W / 2
+            const cy = infoPosRef.current.y + INFO_H / 2
+            const rx = p.x + WIDGET_W / 2
+            const ry = p.y + WIDGET_H / 2
+            const ang = Math.atan2(cy - ry, cx - rx)
+            infoPosRef.current.x = rx + Math.cos(ang) * (WIDGET_W / 2 + INFO_W / 2 + 2)
+            infoPosRef.current.y = ry + Math.sin(ang) * (WIDGET_H / 2 + INFO_H / 2 + 2)
+            infoVelRef.current = { x: -infoVelRef.current.x * 0.7, y: -infoVelRef.current.y * 0.7 }
+          }
+          if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
+        }
+      } else {
+        // returning：向角色下方移动；到达且角色静止则跟随，否则继续追
+        const dx = anchor.x - infoPosRef.current.x
+        const dy = anchor.y - infoPosRef.current.y
+        const d = Math.hypot(dx, dy)
+        if (d < 8) {
+          const speed = Math.hypot(p.x - lastRolePosRef.current.x, p.y - lastRolePosRef.current.y) / dt
+          if (speed < 4) {
+            infoModeRef.current = 'follow'
+            infoVelRef.current = { x: 0, y: 0 }
+          }
+        } else {
+          infoPosRef.current = { x: infoPosRef.current.x + dx * 0.15, y: infoPosRef.current.y + dy * 0.15 }
+        }
+      }
+      lastRolePosRef.current = { x: p.x, y: p.y }
+      setInfoPos(infoPosRef.current)
+      setInfoMode(infoModeRef.current)
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [config.showInfo, config.followThreshold])
+
   // 右键菜单
   const onContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -291,6 +386,54 @@ export function WhaleWidget() {
       })
       .catch(() => setProviders([]))
   }, [])
+
+  // 信息面板拖拽：直接拖动信息面板 → 进入独立状态（跟手移动；松手后自由+倒计时回归）
+  const onInfoDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      infoModeRef.current = 'free'
+      freeStartRef.current = performance.now()
+      infoDragRef.current = { dx: e.clientX - infoPosRef.current.x, dy: e.clientY - infoPosRef.current.y }
+      infoVelRef.current = { x: 0, y: 0 }
+      try {
+        ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+      } catch {
+        // ignore
+      }
+    },
+    []
+  )
+  const onInfoMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!infoDragRef.current) return
+      let nx = e.clientX - infoDragRef.current.dx
+      let ny = e.clientY - infoDragRef.current.dy
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      if (nx < 8) nx = 8
+      if (nx > vw - INFO_W - 8) nx = vw - INFO_W - 8
+      if (ny < 8) ny = 8
+      if (ny > vh - INFO_H - 8) ny = vh - INFO_H - 8
+      infoPosRef.current = { x: nx, y: ny }
+      infoVelRef.current = { x: 0, y: 0 }
+      setInfoPos(infoPosRef.current)
+    },
+    []
+  )
+  const onInfoUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (!infoDragRef.current) return
+      infoDragRef.current = null
+      freeStartRef.current = performance.now()
+      try {
+        ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+      } catch {
+        // ignore
+      }
+    },
+    []
+  )
 
   // Switch default API provider (writes agent-default-model in settings.yaml)
   const handleSwitchProvider = useCallback((id: string) => {
@@ -710,7 +853,15 @@ export function WhaleWidget() {
           />
         )}
         {config.showInfo && (
-          <InfoPanel sys={state.sysInfo} />
+          <div
+            className="wg-info"
+            style={{ position: 'fixed', left: infoPos.x, top: infoPos.y, zIndex: 2147483646 }}
+            onPointerDown={onInfoDown}
+            onPointerMove={onInfoMove}
+            onPointerUp={onInfoUp}
+          >
+            <InfoPanel sys={state.sysInfo} />
+          </div>
         )}
         {config.showBubble && bubble && (
           <Bubble

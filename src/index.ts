@@ -53,6 +53,8 @@ export interface WidgetConfig {
   realtimeBalance: boolean
   /** 是否显示信息面板（时间/系统资源） */
   showInfo: boolean
+  /** 信息面板跟随角色的距离阈值（超过则脱钩独立）；px */
+  followThreshold: number
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -68,7 +70,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   lowBalance: 10,
   showWorkState: true,
   realtimeBalance: false,
-  showInfo: false
+  showInfo: false,
+  followThreshold: 180
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -87,7 +90,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     lowBalance: Number.isFinite(Number(o.lowBalance)) ? Math.max(0, Number(o.lowBalance)) : 10,
     showWorkState: o.showWorkState !== false,
     realtimeBalance: o.realtimeBalance === true,
-    showInfo: o.showInfo !== false
+    showInfo: o.showInfo !== false,
+    followThreshold: Number.isFinite(Number(o.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(o.followThreshold)))) : 180
   }
 }
 

@@ -23,6 +23,8 @@ export interface MenuConfig {
   realtimeBalance: boolean
   /** 是否显示信息面板（时间/系统资源） */
   showInfo: boolean
+  /** 信息面板跟随距离阈值（超过则脱钩独立）px */
+  followThreshold: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -51,7 +53,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   lowBalance: 10,
   showWorkState: true,
   realtimeBalance: false,
-  showInfo: false
+  showInfo: false,
+  followThreshold: 180
 }
 
 interface Props {
@@ -165,6 +168,22 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
           value={config.frost}
           onChange={(e) => set({ frost: Number(e.target.value) })}
           title="进度条底板的毛玻璃模糊强度（0 = 关闭，更省资源）"
+        />
+      </div>
+      <div className="wg-menu-divider" />
+      <div className="wg-menu-title">
+        信息跟随阈值 <span className="wg-menu-power">{config.followThreshold}px</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={60}
+          max={360}
+          step={20}
+          value={config.followThreshold}
+          onChange={(e) => set({ followThreshold: Number(e.target.value) })}
+          title="信息面板与角色距离超过该值就脱钩独立（越小越容易脱开）"
         />
       </div>
       <div className="wg-menu-divider" />
