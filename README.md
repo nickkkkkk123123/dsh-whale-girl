@@ -86,6 +86,14 @@ dsh plugin add nickkkkkk123123/dsh-whale-girl
 
 测量方法：重启 DSH 后等待 80 秒（越过省电阈值），对全部 DSH 进程取 `TotalProcessorTime`，测 65 秒窗口增量，省电开/关各测一轮取差值。动画的渲染成本主要在 GPU 合成器的逐帧调度（省电模式已消除），CPU 侧几乎免费——"桌宠 = Electron 大户"的印象对本插件不成立。
 
+## 已知问题：DSH 流式输出时挂件卡顿
+
+**现象**：agent 输出长文字（流式）时，挂件（及同页 UI）在相邻 token 之间会卡顿，输出完毕立即恢复流畅。
+
+**问题真正所在**：**不在本插件**。DSH 前端（官方 `deepseek-ai/deepseek-harness`，DSH Desktop 通过 submodule 引入）在流式输出时**每收到一个 token 就整体重建当前 assistant 消息**（`assistant.ts` 的 `updateChunk` 每 chunk 复制 blocks + 重新渲染整条消息），占用主线程；本挂件与它同页面/同主线程，被连带卡住。虚拟列表已解决长会话整体渲染，但**"流式每 token 全量重建当前消息"是剩余瓶颈**。
+
+**本插件已做的缓解**：`thinking`（DSH 输出/思考）时暂停信息面板物理循环（省主线程，可通过菜单开关）；transform 定位（不触发 layout reflow）；信息面板物理循环减负。**根治在 DSH 的流式渲染层**（该问题已反馈给 DSH Desktop 作者，见其 issue）；挂件自身不产生该卡顿。
+
 ## 数据链路（为什么不用 fetch）
 
 DSH Desktop 的 webserver 会对不带 renderer 认证头的子资源请求返回 **403**（包括 `fetch`、`<img>`、`<audio>`、`<script>`）。因此：
