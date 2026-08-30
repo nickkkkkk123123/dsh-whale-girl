@@ -854,7 +854,6 @@ export function WhaleWidget() {
         )}
         {config.showInfo && (
           <div
-            className="wg-info"
             style={{ position: 'fixed', left: infoPos.x, top: infoPos.y, zIndex: 2147483646 }}
             onPointerDown={onInfoDown}
             onPointerMove={onInfoMove}
