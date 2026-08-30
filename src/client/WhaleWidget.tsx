@@ -368,7 +368,7 @@ export function WhaleWidget() {
           const q = infoPosRef.current
           const v = infoVelRef.current
           infoPosRef.current = { x: q.x + v.x * dt, y: q.y + v.y * dt }
-          infoVelRef.current = { x: v.x * 0.985, y: v.y * 0.985 }
+          infoVelRef.current = { x: v.x * 0.997, y: v.y * 0.997 }
           const vw = window.innerWidth
           const vh = window.innerHeight
           if (infoPosRef.current.x < 8) { infoPosRef.current.x = 8; infoVelRef.current.x = Math.abs(infoVelRef.current.x) * 0.8 }
