@@ -671,10 +671,10 @@ export function WhaleWidget() {
     trackerRef.current.push(e.clientX, e.clientY)
     let nx = Math.max(0, Math.min(window.innerWidth - WIDGET_W, e.clientX - dragRef.current.dx))
     let ny = Math.max(0, Math.min(window.innerHeight - WIDGET_H, e.clientY - dragRef.current.dy))
-    // 拖拽角色撞到信息面板：角色被挡回（沿面板中心-角色中心法线推到面板外，不能压穿）
+    // 拖拽角色撞到信息面板：角色被挡回 + 面板被角色挤开（让开）
     const ob = __wgInfoGlobal
     if (ob && nx < ob.x + ob.w && nx + WIDGET_W > ob.x && ny < ob.y + ob.h && ny + WIDGET_H > ob.y) {
-      // 最小穿透轴推出：角色被挡在面板一侧，沿另一轴可滑动（避免来回抽搐）
+      // 挡回：最小穿透轴推出（另一轴可滑）
       const overlapW = Math.min(nx + WIDGET_W - ob.x, ob.x + ob.w - nx)
       const overlapH = Math.min(ny + WIDGET_H - ob.y, ob.y + ob.h - ny)
       if (overlapW < overlapH) {
@@ -684,6 +684,13 @@ export function WhaleWidget() {
       }
       nx = Math.max(0, Math.min(window.innerWidth - WIDGET_W, nx))
       ny = Math.max(0, Math.min(window.innerHeight - WIDGET_H, ny))
+      // 面板被角色挤开：沿角色拖拽方向给面板速度（面板让开，过渡更丝滑）
+      const rv = trackerRef.current.velocity()
+      if (rv) {
+        infoModeRef.current = 'free'
+        infoVelRef.current = { x: rv.vx * 0.5, y: rv.vy * 0.5 }
+        freeStartRef.current = performance.now()
+      }
     }
     setPos({ x: nx, y: ny })
   }, [markActive])
