@@ -462,7 +462,7 @@ export function WhaleWidget() {
       __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: INFO_W, h: INFO_H }
       // 减负：改为低频调度（约 20fps），面板跟随/碰撞足够平滑，显著降 CPU
     }
-    const iv = window.setInterval(() => step(performance.now()), 50)
+    const iv = window.setInterval(() => step(performance.now()), 100)
     return () => window.clearInterval(iv)
   }, [config.showInfo, config.followThreshold])
 
