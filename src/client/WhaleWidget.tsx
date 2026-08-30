@@ -863,16 +863,6 @@ export function WhaleWidget() {
             showPeak={config.showPeak}
           />
         )}
-        {config.showInfo && (
-          <div
-            style={{ position: 'fixed', left: infoPos.x, top: infoPos.y, zIndex: 2147483646 }}
-            onPointerDown={onInfoDown}
-            onPointerMove={onInfoMove}
-            onPointerUp={onInfoUp}
-          >
-            <InfoPanel sys={state.sysInfo} />
-          </div>
-        )}
         {config.showBubble && bubble && (
           <Bubble
             text={bubble}
@@ -881,6 +871,16 @@ export function WhaleWidget() {
           />
         )}
       </div>
+      {config.showInfo && (
+        <div
+          style={{ position: 'fixed', left: infoPos.x, top: infoPos.y, zIndex: 2147483646 }}
+          onPointerDown={onInfoDown}
+          onPointerMove={onInfoMove}
+          onPointerUp={onInfoUp}
+        >
+          <InfoPanel sys={state.sysInfo} />
+        </div>
+      )}
       {sling &&
         (() => {
           const fx = sling.fx
