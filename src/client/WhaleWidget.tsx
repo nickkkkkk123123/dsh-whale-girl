@@ -39,6 +39,14 @@ const INFO_W = 132
 const INFO_H = 66
 /** 信息面板独立状态维持时长（ms），之后尝试回归。 */
 const FREE_MS = 4000
+/** 矩形(rx,ry,rw,rh) 与圆(cx,cy,cr) 是否相交。 */
+function circleRectHit(rx: number, ry: number, rw: number, rh: number, cx: number, cy: number, cr: number): boolean {
+  const nx = Math.max(rx, Math.min(cx, rx + rw))
+  const ny = Math.max(ry, Math.min(cy, ry + rh))
+  const dx = cx - nx
+  const dy = cy - ny
+  return dx * dx + dy * dy <= cr * cr
+}
 
 function normalizeConfig(o: unknown): MenuConfig {
   const any = (o && typeof o === 'object' ? o : {}) as Record<string, unknown>
@@ -317,6 +325,11 @@ export function WhaleWidget() {
       const cX = (v: number) => Math.max(8, Math.min(vw - INFO_W - 8, v))
       const cY = (v: number) => Math.max(8, Math.min(vh - INFO_H - 8, v))
       const anchor = { x: cX(p.x + WIDGET_W / 2 - INFO_W / 2), y: cY(p.y + WIDGET_H + 12) }
+      // 角色圆形碰撞箱（视觉区域，避免矩形含下方空白）
+      const roleH = WIDGET_H * 0.78
+      const roleCx = p.x + WIDGET_W / 2
+      const roleCy = p.y + roleH / 2
+      const roleR = Math.max(22, Math.min(WIDGET_W, roleH) / 2 * 0.9)
       if (infoModeRef.current === 'follow') {
         const k = 0.12
         const nx = infoPosRef.current.x + (anchor.x - infoPosRef.current.x) * k
@@ -327,18 +340,12 @@ export function WhaleWidget() {
           infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
           freeStartRef.current = now
         } else {
-          // 跟随时：用信息面板当前位置与角色（视觉区域）判碰撞 → 角色压到面板即进入独立并沿法线弹开
+          // 跟随时：角色（圆）压到面板 → 进入独立并沿法线弹开
           const ip = infoPosRef.current
-          const followRoleH = WIDGET_H * 0.78
-          if (
-            ip.x < p.x + WIDGET_W && ip.x + INFO_W > p.x &&
-            ip.y < p.y + followRoleH && ip.y + INFO_H > p.y
-          ) {
+          if (circleRectHit(ip.x, ip.y, INFO_W, INFO_H, roleCx, roleCy, roleR)) {
             const icx = ip.x + INFO_W / 2
             const icy = ip.y + INFO_H / 2
-            const rcxp = p.x + WIDGET_W / 2
-            const rcyp = p.y + followRoleH / 2
-            const ang = Math.atan2(icy - rcyp, icx - rcxp)
+            const ang = Math.atan2(icy - roleCy, icx - roleCx)
             infoModeRef.current = 'free'
             infoVelRef.current = { x: Math.cos(ang) * 4, y: Math.sin(ang) * 4 }
             freeStartRef.current = now
@@ -361,19 +368,13 @@ export function WhaleWidget() {
           if (infoPosRef.current.x > vw - INFO_W - 8) { infoPosRef.current.x = vw - INFO_W - 8; infoVelRef.current.x = -Math.abs(infoVelRef.current.x) * 0.8 }
           if (infoPosRef.current.y < 8) { infoPosRef.current.y = 8; infoVelRef.current.y = Math.abs(infoVelRef.current.y) * 0.8 }
           if (infoPosRef.current.y > vh - INFO_H - 8) { infoPosRef.current.y = vh - INFO_H - 8; infoVelRef.current.y = -Math.abs(infoVelRef.current.y) * 0.8 }
-          // 与角色（视觉区域）碰撞 → 反弹推出（用角色图像实际高度，避免和下方空白误判）
-          const roleH = WIDGET_H * 0.78
-          if (
-            infoPosRef.current.x < p.x + WIDGET_W && infoPosRef.current.x + INFO_W > p.x &&
-            infoPosRef.current.y < p.y + roleH && infoPosRef.current.y + INFO_H > p.y
-          ) {
-            const cx = infoPosRef.current.x + INFO_W / 2
-            const cy = infoPosRef.current.y + INFO_H / 2
-            const rx = p.x + WIDGET_W / 2
-            const ry = p.y + roleH / 2
-            const ang = Math.atan2(cy - ry, cx - rx)
-            infoPosRef.current.x = cX(rx + Math.cos(ang) * (WIDGET_W / 2 + INFO_W / 2 + 4))
-            infoPosRef.current.y = cY(ry + Math.sin(ang) * (roleH / 2 + INFO_H / 2 + 4))
+          // 与角色（圆）碰撞 → 推出角色外并反射速度
+          if (circleRectHit(infoPosRef.current.x, infoPosRef.current.y, INFO_W, INFO_H, roleCx, roleCy, roleR)) {
+            const icx = infoPosRef.current.x + INFO_W / 2
+            const icy = infoPosRef.current.y + INFO_H / 2
+            const ang = Math.atan2(icy - roleCy, icx - roleCx)
+            infoPosRef.current.x = cX(roleCx + Math.cos(ang) * (roleR + INFO_W / 2 + 4))
+            infoPosRef.current.y = cY(roleCy + Math.sin(ang) * (roleR + INFO_H / 2 + 4))
             infoVelRef.current = { x: -infoVelRef.current.x, y: -infoVelRef.current.y }
           }
           if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
