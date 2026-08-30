@@ -52,6 +52,9 @@ export interface FlingOptions {
   onMove: (x: number, y: number) => void
   onBounce?: (axis: 'x' | 'y') => void
   onDone?: (x: number, y: number) => void
+  /** 障碍（信息面板）矩形；角色甩抛撞到它时角色反弹，并回调 onObstacleHit 让面板获得动量。 */
+  getObstacle?: () => { x: number; y: number; w: number; h: number } | null
+  onObstacleHit?: (nx: number, ny: number) => void
 }
 
 const STOP_SPEED = 34
@@ -92,6 +95,26 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
 
     x += vx * dt
     y += vy * dt
+
+    // 撞障碍（信息面板）：角色沿离开面板方向反弹，并通知面板获得动量
+    const ob = opts.getObstacle?.()
+    if (ob && x < ob.x + ob.w && x + opts.width > ob.x && y < ob.y + ob.h && y + opts.height > ob.y) {
+      const ccx = x + opts.width / 2
+      const ccy = y + opts.height / 2
+      const ocx = ob.x + ob.w / 2
+      const ocy = ob.y + ob.h / 2
+      const ang = Math.atan2(ccy - ocy, ccx - ocx)
+      const nx = Math.cos(ang)
+      const ny = Math.sin(ang)
+      const dot = vx * nx + vy * ny
+      if (dot < 0) {
+        vx = vx - 2 * dot * nx
+        vy = vy - 2 * dot * ny
+      }
+      x = ocx + nx * (ob.w / 2 + opts.width / 2 + 2)
+      y = ocy + ny * (ob.h / 2 + opts.height / 2 + 2)
+      opts.onObstacleHit?.(nx, ny)
+    }
 
     const b = bounds()
     if (x <= b.left) {

@@ -39,6 +39,8 @@ const INFO_W = 132
 const INFO_H = 66
 /** 信息面板独立状态维持时长（ms），之后尝试回归。 */
 const FREE_MS = 4000
+/** 信息面板当前矩形（共享给角色甩抛做障碍反馈）。 */
+let __wgInfoGlobal: { x: number; y: number; w: number; h: number } | null = null
 /** 矩形(rx,ry,rw,rh) 与圆(cx,cy,cr) 是否相交。 */
 function circleRectHit(rx: number, ry: number, rw: number, rh: number, cx: number, cy: number, cr: number): boolean {
   const nx = Math.max(rx, Math.min(cx, rx + rw))
@@ -423,6 +425,7 @@ export function WhaleWidget() {
         iel.style.left = `${infoPosRef.current.x}px`
         iel.style.top = `${infoPosRef.current.y}px`
       }
+      __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: INFO_W, h: INFO_H }
       raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
@@ -491,6 +494,13 @@ export function WhaleWidget() {
     },
     []
   )
+  const getObstacle = useCallback(() => __wgInfoGlobal, [])
+  const handleObstacleHit = useCallback((nx: number, ny: number) => {
+    // 角色撞到面板：面板获得动量（被撞向 -法线方向）
+    infoModeRef.current = 'free'
+    infoVelRef.current = { x: -nx * 6, y: -ny * 6 }
+    freeStartRef.current = performance.now()
+  }, [])
   const onInfoUp = useCallback(
     (e: React.PointerEvent) => {
       if (!infoDragRef.current) return
@@ -722,6 +732,8 @@ export function WhaleWidget() {
               vy,
               width: WIDGET_W,
               height: WIDGET_H,
+              getObstacle,
+              onObstacleHit: handleObstacleHit,
               onMove: (x, y) => setPos({ x, y }),
               onBounce: (axis) => {
                 bounced = true
