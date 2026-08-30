@@ -35,7 +35,7 @@ const WIDGET_H = 180
 /** 松手速度（px/s）超过此值进入甩抛弹跳模式。 */
 const FLING_SPEED = 800
 /** 信息面板（独立窗口）尺寸。 */
-const INFO_W = 142
+const INFO_W = 132
 const INFO_H = 66
 /** 信息面板独立状态维持时长（ms），之后尝试回归。 */
 const FREE_MS = 4000
@@ -353,8 +353,8 @@ export function WhaleWidget() {
             const rx = p.x + WIDGET_W / 2
             const ry = p.y + WIDGET_H / 2
             const ang = Math.atan2(cy - ry, cx - rx)
-            infoPosRef.current.x = rx + Math.cos(ang) * (WIDGET_W / 2 + INFO_W / 2 + 2)
-            infoPosRef.current.y = ry + Math.sin(ang) * (WIDGET_H / 2 + INFO_H / 2 + 2)
+            infoPosRef.current.x = cX(rx + Math.cos(ang) * (WIDGET_W / 2 + INFO_W / 2 + 2))
+            infoPosRef.current.y = cY(ry + Math.sin(ang) * (WIDGET_H / 2 + INFO_H / 2 + 2))
             infoVelRef.current = { x: -infoVelRef.current.x * 0.7, y: -infoVelRef.current.y * 0.7 }
           }
           if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
