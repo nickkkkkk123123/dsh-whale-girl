@@ -25,6 +25,8 @@ export interface MenuConfig {
   showInfo: boolean
   /** 信息面板跟随距离阈值（超过则脱钩独立）px */
   followThreshold: number
+  /** 信息面板高斯模糊强度（backdrop-filter blur，0=关闭），0~16 默认 4；与进度条独立 */
+  infoFrost: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -54,7 +56,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   showWorkState: true,
   realtimeBalance: false,
   showInfo: false,
-  followThreshold: 180
+  followThreshold: 180,
+  infoFrost: 4
 }
 
 interface Props {
@@ -184,6 +187,22 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
           value={config.followThreshold}
           onChange={(e) => set({ followThreshold: Number(e.target.value) })}
           title="信息面板与角色距离超过该值就脱钩独立（越小越容易脱开）"
+        />
+      </div>
+      <div className="wg-menu-divider" />
+      <div className="wg-menu-title">
+        面板模糊 <span className="wg-menu-power">{config.infoFrost === 0 ? '关' : `×${config.infoFrost}`}</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={0}
+          max={16}
+          step={1}
+          value={config.infoFrost}
+          onChange={(e) => set({ infoFrost: Number(e.target.value) })}
+          title="信息面板高斯模糊强度（0 = 关闭；越高越模糊、GPU 越高）"
         />
       </div>
       <div className="wg-menu-divider" />

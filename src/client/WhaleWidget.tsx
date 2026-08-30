@@ -96,7 +96,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     showWorkState: any.showWorkState !== false,
     realtimeBalance: any.realtimeBalance === true,
     showInfo: any.showInfo !== false,
-    followThreshold: Number.isFinite(Number(any.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(any.followThreshold)))) : 180
+    followThreshold: Number.isFinite(Number(any.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(any.followThreshold)))) : 180,
+    infoFrost: Number.isFinite(Number(any.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(any.infoFrost)))) : 4
   }
 }
 
@@ -1006,7 +1007,7 @@ export function WhaleWidget() {
       {config.showInfo && (
         <div
           ref={infoElRef}
-          style={{ position: 'fixed', zIndex: 2147483646, ['--wg-frost' as any]: `${Math.min(config.frost, 8)}px` }}
+          style={{ position: 'fixed', zIndex: 2147483646, ['--wg-frost' as any]: `${config.infoFrost}px` }}
           onPointerDown={onInfoDown}
           onPointerMove={onInfoMove}
           onPointerUp={onInfoUp}

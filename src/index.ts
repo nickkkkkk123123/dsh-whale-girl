@@ -57,6 +57,8 @@ export interface WidgetConfig {
   showInfo: boolean
   /** 信息面板跟随角色的距离阈值（超过则脱钩独立）；px */
   followThreshold: number
+  /** 信息面板高斯模糊强度（backdrop-filter blur，0=关闭），0~16 默认 4；与进度条 frost 独立 */
+  infoFrost: number
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -73,7 +75,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   showWorkState: true,
   realtimeBalance: false,
   showInfo: false,
-  followThreshold: 180
+  followThreshold: 180,
+  infoFrost: 4
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -93,7 +96,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     showWorkState: o.showWorkState !== false,
     realtimeBalance: o.realtimeBalance === true,
     showInfo: o.showInfo !== false,
-    followThreshold: Number.isFinite(Number(o.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(o.followThreshold)))) : 180
+    followThreshold: Number.isFinite(Number(o.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(o.followThreshold)))) : 180,
+    infoFrost: Number.isFinite(Number(o.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(o.infoFrost)))) : 4
   }
 }
 
