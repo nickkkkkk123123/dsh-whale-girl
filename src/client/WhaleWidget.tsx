@@ -532,6 +532,47 @@ export function WhaleWidget() {
         infoElRef.current.style.left = `${nx}px`
         infoElRef.current.style.top = `${ny}px`
       }
+      // 拖拽面板撞到静止/吸附角色 → 角色获得动量（被撞飞）
+      if (!dragging && !flinging) {
+        const roleH = WIDGET_H * 0.78
+        const roleCx = posRef.current.x + WIDGET_W / 2
+        const roleCy = posRef.current.y + roleH / 2
+        const roleR = Math.max(22, Math.min(WIDGET_W, roleH) / 2 * 0.9)
+        if (circleRectHit(infoPosRef.current.x, infoPosRef.current.y, INFO_W, INFO_H, roleCx, roleCy, roleR)) {
+          const pvx = infoVelRef.current.x
+          const pvy = infoVelRef.current.y
+          if (Math.hypot(pvx, pvy) > 60) {
+            setFlinging(true)
+            flingRef.current?.cancel()
+            let bounced = false
+            flingRef.current = startFling({
+              x: posRef.current.x,
+              y: posRef.current.y,
+              vx: pvx * 0.7,
+              vy: pvy * 0.7,
+              width: WIDGET_W,
+              height: WIDGET_H,
+              getObstacle,
+              onObstacleHit: handleObstacleHit,
+              onMove: (x, y) => setPos({ x, y }),
+              onBounce: (axis) => {
+                bounced = true
+                soundRef.current?.bounce()
+                shake()
+                setBounceAxis(axis)
+                window.clearTimeout(bounceTimerRef.current)
+                bounceTimerRef.current = window.setTimeout(() => setBounceAxis(null), 260)
+              },
+              onDone: (x, y) => {
+                flingRef.current = null
+                setFlinging(false)
+                if (!bounced) soundRef.current?.bounce()
+                snap(x, y)
+              }
+            })
+          }
+        }
+      }
     },
     []
   )
