@@ -14,6 +14,8 @@ const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 const USAGE_FILE = path.join(DSH_HOME, '.whale-girl-usage.json')
 const CONFIG_FILE = path.join(DSH_HOME, '.whale-girl-config.json')
 const DIAG_FILE = path.join(DSH_HOME, '.whale-girl-diag.log')
+/** CPU 采样缓存（用 os.cpus() 时间差计算占用，Windows 无 loadavg）。 */
+let lastCpuTimes: { total: number; busy: number } | null = null
 const ASSET_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../assets')
 
 /** 诊断记录（排查 client 数据是否到达、host 数据是否就绪）。用完可删除该日志文件。 */
@@ -362,9 +364,23 @@ export function apply(ctx: any) {
       const free = os.freemem()
       const used = total - free
       const memPct = total > 0 ? Math.round((used / total) * 100) : 0
-      const load = os.loadavg()[0]
-      const cpus = os.cpus().length
-      const cpu = Math.min(100, Math.round((load / Math.max(1, cpus)) * 100))
+      // CPU：用 os.cpus() 时间差（loadavg 在 Windows 恒为 0，这里跨两次采样算真实占用）
+      const cpus = os.cpus()
+      let cpuTotal = 0
+      let cpuIdle = 0
+      for (const c of cpus) {
+        const t = c.times as unknown as Record<string, number>
+        cpuTotal += (t.user || 0) + (t.nice || 0) + (t.sys || 0) + (t.idle || 0) + (t.irq || 0)
+        cpuIdle += t.idle || 0
+      }
+      const cpuBusy = cpuTotal - cpuIdle
+      let cpu = 0
+      if (lastCpuTimes) {
+        const dTotal = cpuTotal - lastCpuTimes.total
+        const dBusy = cpuBusy - lastCpuTimes.busy
+        if (dTotal > 0) cpu = Math.min(100, Math.round((dBusy / dTotal) * 100))
+      }
+      lastCpuTimes = { total: cpuTotal, busy: cpuBusy }
       return {
         memPct,
         memUsed: Math.round((used / 1024 ** 3) * 10) / 10,

@@ -326,7 +326,18 @@ export function WhaleWidget() {
           infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
           freeStartRef.current = now
         } else {
-          infoPosRef.current = { x: nx, y: ny }
+          // 跟随时也与角色碰撞（角色快速移动导致信息面板滞后并压到角色）→ 进入独立并反弹
+          const followRoleH = WIDGET_H * 0.78
+          if (
+            nx < p.x + WIDGET_W && nx + INFO_W > p.x &&
+            ny < p.y + followRoleH && ny + INFO_H > p.y
+          ) {
+            infoModeRef.current = 'free'
+            infoVelRef.current = { x: (infoPosRef.current.x - nx) / dt, y: (infoPosRef.current.y - ny) / dt }
+            freeStartRef.current = now
+          } else {
+            infoPosRef.current = { x: nx, y: ny }
+          }
         }
       } else if (infoModeRef.current === 'free') {
         // 用户正在直接拖动信息面板 → 交给 onInfoMove，不做惯性
@@ -356,7 +367,7 @@ export function WhaleWidget() {
             const ang = Math.atan2(cy - ry, cx - rx)
             infoPosRef.current.x = cX(rx + Math.cos(ang) * (WIDGET_W / 2 + INFO_W / 2 + 4))
             infoPosRef.current.y = cY(ry + Math.sin(ang) * (roleH / 2 + INFO_H / 2 + 4))
-            infoVelRef.current = { x: -infoVelRef.current.x * 0.9, y: -infoVelRef.current.y * 0.9 }
+            infoVelRef.current = { x: -infoVelRef.current.x, y: -infoVelRef.current.y }
           }
           if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
         }
@@ -882,7 +893,7 @@ export function WhaleWidget() {
       {config.showInfo && (
         <div
           ref={infoElRef}
-          style={{ position: 'fixed', zIndex: 2147483646 }}
+          style={{ position: 'fixed', zIndex: 2147483646, ['--wg-frost' as any]: `${config.frost}px` }}
           onPointerDown={onInfoDown}
           onPointerMove={onInfoMove}
           onPointerUp={onInfoUp}
