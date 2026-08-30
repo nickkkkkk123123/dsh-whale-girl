@@ -333,7 +333,7 @@ export function WhaleWidget() {
             ny < p.y + followRoleH && ny + INFO_H > p.y
           ) {
             infoModeRef.current = 'free'
-            infoVelRef.current = { x: (infoPosRef.current.x - nx) / dt, y: (infoPosRef.current.y - ny) / dt }
+            infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
             freeStartRef.current = now
           } else {
             infoPosRef.current = { x: nx, y: ny }
