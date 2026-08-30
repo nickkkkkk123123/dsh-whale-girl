@@ -462,8 +462,14 @@ export function WhaleWidget() {
       __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: INFO_W, h: INFO_H }
       // 减负：改为低频调度（约 20fps），面板跟随/碰撞足够平滑，显著降 CPU
     }
-    const iv = window.setInterval(() => step(performance.now()), 100)
-    return () => window.clearInterval(iv)
+    // 位置用 rAF 高频顺滑更新（直接写 DOM 轻量），避免降频导致"一帧一帧走"
+    let raf = 0
+    const loop = (now: number) => {
+      step(now)
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
   }, [config.showInfo, config.followThreshold])
 
   // 右键菜单
