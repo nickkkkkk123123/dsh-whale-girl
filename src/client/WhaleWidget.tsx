@@ -340,14 +340,18 @@ export function WhaleWidget() {
           infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
           freeStartRef.current = now
         } else {
-          // 跟随时：角色（圆）压到面板 → 进入独立并沿法线弹开
+          // 跟随时：角色（圆）压到面板 → 立即推出角色圆外并沿法线弹开（避免先吸附到角色下方）
           const ip = infoPosRef.current
           if (circleRectHit(ip.x, ip.y, INFO_W, INFO_H, roleCx, roleCy, roleR)) {
             const icx = ip.x + INFO_W / 2
             const icy = ip.y + INFO_H / 2
             const ang = Math.atan2(icy - roleCy, icx - roleCx)
             infoModeRef.current = 'free'
-            infoVelRef.current = { x: Math.cos(ang) * 4, y: Math.sin(ang) * 4 }
+            infoPosRef.current = {
+              x: cX(roleCx + Math.cos(ang) * (roleR + INFO_W / 2 + 4)),
+              y: cY(roleCy + Math.sin(ang) * (roleR + INFO_H / 2 + 4))
+            }
+            infoVelRef.current = { x: Math.cos(ang) * 5, y: Math.sin(ang) * 5 }
             freeStartRef.current = now
           } else {
             infoPosRef.current = { x: nx, y: ny }
