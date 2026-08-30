@@ -126,6 +126,7 @@ export function WhaleWidget() {
   const freeStartRef = useRef(0)
   const lastRolePosRef = useRef({ x: 0, y: 0 })
   const infoDragRef = useRef<{ dx: number; dy: number } | null>(null)
+  const infoMoveLastRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const flingRef = useRef<{ cancel: () => void } | null>(null)
   const bounceTimerRef = useRef(0)
   const petTimerRef = useRef(0)
@@ -326,14 +327,20 @@ export function WhaleWidget() {
           infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
           freeStartRef.current = now
         } else {
-          // 跟随时也与角色碰撞（角色快速移动导致信息面板滞后并压到角色）→ 进入独立并反弹
+          // 跟随时：用信息面板当前位置与角色（视觉区域）判碰撞 → 角色压到面板即进入独立并沿法线弹开
+          const ip = infoPosRef.current
           const followRoleH = WIDGET_H * 0.78
           if (
-            nx < p.x + WIDGET_W && nx + INFO_W > p.x &&
-            ny < p.y + followRoleH && ny + INFO_H > p.y
+            ip.x < p.x + WIDGET_W && ip.x + INFO_W > p.x &&
+            ip.y < p.y + followRoleH && ip.y + INFO_H > p.y
           ) {
+            const icx = ip.x + INFO_W / 2
+            const icy = ip.y + INFO_H / 2
+            const rcxp = p.x + WIDGET_W / 2
+            const rcyp = p.y + followRoleH / 2
+            const ang = Math.atan2(icy - rcyp, icx - rcxp)
             infoModeRef.current = 'free'
-            infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
+            infoVelRef.current = { x: Math.cos(ang) * 4, y: Math.sin(ang) * 4 }
             freeStartRef.current = now
           } else {
             infoPosRef.current = { x: nx, y: ny }
@@ -423,6 +430,7 @@ export function WhaleWidget() {
       freeStartRef.current = performance.now()
       infoDragRef.current = { dx: e.clientX - infoPosRef.current.x, dy: e.clientY - infoPosRef.current.y }
       infoVelRef.current = { x: 0, y: 0 }
+      infoMoveLastRef.current = { x: infoPosRef.current.x, y: infoPosRef.current.y, t: performance.now() }
       try {
         ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
       } catch {
@@ -443,7 +451,16 @@ export function WhaleWidget() {
       if (ny < 8) ny = 8
       if (ny > vh - INFO_H - 8) ny = vh - INFO_H - 8
       infoPosRef.current = { x: nx, y: ny }
-      infoVelRef.current = { x: 0, y: 0 }
+      // 记录拖拽速度（松手后作为甩抛惯性）
+      const now = performance.now()
+      const lastM = infoMoveLastRef.current
+      if (lastM) {
+        const dts = Math.max(8, now - lastM.t)
+        infoVelRef.current = { x: ((nx - lastM.x) / dts) * 1000, y: ((ny - lastM.y) / dts) * 1000 }
+        infoMoveLastRef.current = { x: nx, y: ny, t: now }
+      } else {
+        infoVelRef.current = { x: 0, y: 0 }
+      }
       if (infoElRef.current) {
         infoElRef.current.style.left = `${nx}px`
         infoElRef.current.style.top = `${ny}px`
