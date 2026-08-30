@@ -400,6 +400,16 @@ export function WhaleWidget() {
             } else {
               infoVelRef.current = { x: -infoVelRef.current.x, y: -infoVelRef.current.y }
             }
+            // 对称：角色也被面板撞开（角色非拖拽/甩抛中才被推开一点）
+            if (!dragging && !flinging) {
+              const pvx = infoVelRef.current.x
+              const pvy = infoVelRef.current.y
+              const pvl = Math.hypot(pvx, pvy) || 1
+              setPos({
+                x: Math.max(8, Math.min(window.innerWidth - WIDGET_W - 8, p.x + (pvx / pvl) * 6)),
+                y: Math.max(8, Math.min(window.innerHeight - WIDGET_H - 8, p.y + (pvy / pvl) * 6))
+              })
+            }
           }
           if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
         }
