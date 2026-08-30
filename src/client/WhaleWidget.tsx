@@ -74,11 +74,11 @@ function loadLocalConfig(): MenuConfig {
 export function WhaleWidget() {
   const rootRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ x: number; y: number }>(() => ({
-    x: Math.max(0, window.innerWidth - WIDGET_W - 8),
-    y: Math.max(0, window.innerHeight - WIDGET_H - 8)
+    x: Math.max(8, window.innerWidth - WIDGET_W - 8),
+    y: Math.max(8, window.innerHeight - WIDGET_H - INFO_H - 42)
   }))
   // 信息面板：独立窗口（默认跟随角色；距离超阈值或直接拖拽则脱离）
-  const [infoPos, setInfoPos] = useState<{ x: number; y: number }>(() => {
+  const [infoPos] = useState<{ x: number; y: number }>(() => {
     const rw = window.innerWidth
     const rh = window.innerHeight
     const rx = rw - WIDGET_W - 8
@@ -88,7 +88,6 @@ export function WhaleWidget() {
       y: Math.max(8, Math.min(rh - INFO_H - 8, ry + WIDGET_H + 12))
     }
   })
-  const [, setInfoMode] = useState<'follow' | 'free' | 'returning'>('follow')
   const [pressed, setPressed] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [flinging, setFlinging] = useState(false)
@@ -121,6 +120,7 @@ export function WhaleWidget() {
   const idleEggTimerRef = useRef(0)
   const trackerRef = useRef(new FlingTracker())
   const infoPosRef = useRef(infoPos)
+  const infoElRef = useRef<HTMLDivElement>(null)
   const infoModeRef = useRef<'follow' | 'free' | 'returning'>('follow')
   const infoVelRef = useRef({ x: 0, y: 0 })
   const freeStartRef = useRef(0)
@@ -343,19 +343,20 @@ export function WhaleWidget() {
           if (infoPosRef.current.x > vw - INFO_W - 8) { infoPosRef.current.x = vw - INFO_W - 8; infoVelRef.current.x = -Math.abs(infoVelRef.current.x) * 0.8 }
           if (infoPosRef.current.y < 8) { infoPosRef.current.y = 8; infoVelRef.current.y = Math.abs(infoVelRef.current.y) * 0.8 }
           if (infoPosRef.current.y > vh - INFO_H - 8) { infoPosRef.current.y = vh - INFO_H - 8; infoVelRef.current.y = -Math.abs(infoVelRef.current.y) * 0.8 }
-          // 与角色矩形碰撞 → 反弹推出
+          // 与角色（视觉区域）碰撞 → 反弹推出（用角色图像实际高度，避免和下方空白误判）
+          const roleH = WIDGET_H * 0.78
           if (
             infoPosRef.current.x < p.x + WIDGET_W && infoPosRef.current.x + INFO_W > p.x &&
-            infoPosRef.current.y < p.y + WIDGET_H && infoPosRef.current.y + INFO_H > p.y
+            infoPosRef.current.y < p.y + roleH && infoPosRef.current.y + INFO_H > p.y
           ) {
             const cx = infoPosRef.current.x + INFO_W / 2
             const cy = infoPosRef.current.y + INFO_H / 2
             const rx = p.x + WIDGET_W / 2
-            const ry = p.y + WIDGET_H / 2
+            const ry = p.y + roleH / 2
             const ang = Math.atan2(cy - ry, cx - rx)
-            infoPosRef.current.x = cX(rx + Math.cos(ang) * (WIDGET_W / 2 + INFO_W / 2 + 2))
-            infoPosRef.current.y = cY(ry + Math.sin(ang) * (WIDGET_H / 2 + INFO_H / 2 + 2))
-            infoVelRef.current = { x: -infoVelRef.current.x * 0.7, y: -infoVelRef.current.y * 0.7 }
+            infoPosRef.current.x = cX(rx + Math.cos(ang) * (WIDGET_W / 2 + INFO_W / 2 + 4))
+            infoPosRef.current.y = cY(ry + Math.sin(ang) * (roleH / 2 + INFO_H / 2 + 4))
+            infoVelRef.current = { x: -infoVelRef.current.x * 0.9, y: -infoVelRef.current.y * 0.9 }
           }
           if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
         }
@@ -375,8 +376,12 @@ export function WhaleWidget() {
         }
       }
       lastRolePosRef.current = { x: p.x, y: p.y }
-      setInfoPos(infoPosRef.current)
-      setInfoMode(infoModeRef.current)
+      // 直接写 DOM（不每帧 setState，避免 60fps 全量 re-render 卡住渲染器导致 boot 失败）
+      const iel = infoElRef.current
+      if (iel) {
+        iel.style.left = `${infoPosRef.current.x}px`
+        iel.style.top = `${infoPosRef.current.y}px`
+      }
       raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
@@ -428,7 +433,10 @@ export function WhaleWidget() {
       if (ny > vh - INFO_H - 8) ny = vh - INFO_H - 8
       infoPosRef.current = { x: nx, y: ny }
       infoVelRef.current = { x: 0, y: 0 }
-      setInfoPos(infoPosRef.current)
+      if (infoElRef.current) {
+        infoElRef.current.style.left = `${nx}px`
+        infoElRef.current.style.top = `${ny}px`
+      }
     },
     []
   )
@@ -480,8 +488,8 @@ export function WhaleWidget() {
 
   const resetPosition = useCallback(() => {
     setPos({
-      x: Math.max(0, window.innerWidth - WIDGET_W - 8),
-      y: Math.max(0, window.innerHeight - WIDGET_H - 8)
+      x: Math.max(8, window.innerWidth - WIDGET_W - 8),
+      y: Math.max(8, window.innerHeight - WIDGET_H - INFO_H - 42)
     })
     setMenu(null)
   }, [])
@@ -873,7 +881,8 @@ export function WhaleWidget() {
       </div>
       {config.showInfo && (
         <div
-          style={{ position: 'fixed', left: infoPos.x, top: infoPos.y, zIndex: 2147483646 }}
+          ref={infoElRef}
+          style={{ position: 'fixed', zIndex: 2147483646 }}
           onPointerDown={onInfoDown}
           onPointerMove={onInfoMove}
           onPointerUp={onInfoUp}
