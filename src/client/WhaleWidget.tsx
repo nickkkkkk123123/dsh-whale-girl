@@ -47,6 +47,21 @@ function circleRectHit(rx: number, ry: number, rw: number, rh: number, cx: numbe
   const dy = cy - ny
   return dx * dx + dy * dy <= cr * cr
 }
+/** 面板矩形与角色圆碰撞时的法线（圆中心 → 面板最近点方向 = 面板推开方向）；null=不碰。 */
+function panelRoleNormal(px: number, py: number, pW: number, pH: number, cx: number, cy: number, cr: number): { x: number; y: number } | null {
+  const qx = Math.max(px, Math.min(cx, px + pW))
+  const qy = Math.max(py, Math.min(cy, py + pH))
+  let nx = qx - cx
+  let ny = qy - cy
+  const d2 = nx * nx + ny * ny
+  if (d2 > cr * cr) return null
+  if (d2 === 0) {
+    nx = cx < px + pW / 2 ? -1 : 1
+    ny = cy < py + pH / 2 ? -1 : 1
+  }
+  const d = Math.hypot(nx, ny) || 1
+  return { x: nx / d, y: ny / d }
+}
 
 function normalizeConfig(o: unknown): MenuConfig {
   const any = (o && typeof o === 'object' ? o : {}) as Record<string, unknown>
@@ -340,18 +355,17 @@ export function WhaleWidget() {
           infoVelRef.current = { x: (nx - infoPosRef.current.x) / dt, y: (ny - infoPosRef.current.y) / dt }
           freeStartRef.current = now
         } else {
-          // 跟随时：角色（圆）压到面板 → 立即推出角色圆外并沿法线弹开（避免先吸附到角色下方）
+          // 跟随时：角色（圆）压到面板 → 沿最近点法线推出并弹开
           const ip = infoPosRef.current
-          if (circleRectHit(ip.x, ip.y, INFO_W, INFO_H, roleCx, roleCy, roleR)) {
-            const icx = ip.x + INFO_W / 2
-            const icy = ip.y + INFO_H / 2
-            const ang = Math.atan2(icy - roleCy, icx - roleCx)
+          const n = panelRoleNormal(ip.x, ip.y, INFO_W, INFO_H, roleCx, roleCy, roleR)
+          if (n) {
+            const half = Math.max(INFO_W, INFO_H) / 2
             infoModeRef.current = 'free'
             infoPosRef.current = {
-              x: cX(roleCx + Math.cos(ang) * (roleR + INFO_W / 2 + 4)),
-              y: cY(roleCy + Math.sin(ang) * (roleR + INFO_H / 2 + 4))
+              x: cX(roleCx + n.x * (roleR + half + 4)),
+              y: cY(roleCy + n.y * (roleR + half + 4))
             }
-            infoVelRef.current = { x: Math.cos(ang) * 5, y: Math.sin(ang) * 5 }
+            infoVelRef.current = { x: n.x * 5, y: n.y * 5 }
             freeStartRef.current = now
           } else {
             infoPosRef.current = { x: nx, y: ny }
@@ -372,14 +386,18 @@ export function WhaleWidget() {
           if (infoPosRef.current.x > vw - INFO_W - 8) { infoPosRef.current.x = vw - INFO_W - 8; infoVelRef.current.x = -Math.abs(infoVelRef.current.x) * 0.8 }
           if (infoPosRef.current.y < 8) { infoPosRef.current.y = 8; infoVelRef.current.y = Math.abs(infoVelRef.current.y) * 0.8 }
           if (infoPosRef.current.y > vh - INFO_H - 8) { infoPosRef.current.y = vh - INFO_H - 8; infoVelRef.current.y = -Math.abs(infoVelRef.current.y) * 0.8 }
-          // 与角色（圆）碰撞 → 推出角色外并反射速度
-          if (circleRectHit(infoPosRef.current.x, infoPosRef.current.y, INFO_W, INFO_H, roleCx, roleCy, roleR)) {
-            const icx = infoPosRef.current.x + INFO_W / 2
-            const icy = infoPosRef.current.y + INFO_H / 2
-            const ang = Math.atan2(icy - roleCy, icx - roleCx)
-            infoPosRef.current.x = cX(roleCx + Math.cos(ang) * (roleR + INFO_W / 2 + 4))
-            infoPosRef.current.y = cY(roleCy + Math.sin(ang) * (roleR + INFO_H / 2 + 4))
-            infoVelRef.current = { x: -infoVelRef.current.x, y: -infoVelRef.current.y }
+          // 与角色（圆）碰撞 → 沿最近点法线推出并反射速度
+          const n = panelRoleNormal(infoPosRef.current.x, infoPosRef.current.y, INFO_W, INFO_H, roleCx, roleCy, roleR)
+          if (n) {
+            const half = Math.max(INFO_W, INFO_H) / 2
+            infoPosRef.current.x = cX(roleCx + n.x * (roleR + half + 4))
+            infoPosRef.current.y = cY(roleCy + n.y * (roleR + half + 4))
+            const dot = infoVelRef.current.x * n.x + infoVelRef.current.y * n.y
+            if (dot < 0) {
+              infoVelRef.current = { x: infoVelRef.current.x - 2 * dot * n.x, y: infoVelRef.current.y - 2 * dot * n.y }
+            } else {
+              infoVelRef.current = { x: -infoVelRef.current.x, y: -infoVelRef.current.y }
+            }
           }
           if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
         }
