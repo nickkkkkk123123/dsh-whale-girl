@@ -781,6 +781,8 @@ export function WhaleWidget() {
             vy: vel.vy,
             width: WIDGET_W,
             height: WIDGET_H,
+            getObstacle,
+            onObstacleHit: handleObstacleHit,
             onMove: (x, y) => setPos({ x, y }),
             onBounce: (axis) => {
               bounced = true
@@ -846,6 +848,8 @@ export function WhaleWidget() {
           vy: dy * 5,
           width: WIDGET_W,
           height: WIDGET_H,
+          getObstacle,
+          onObstacleHit: handleObstacleHit,
           onMove: (x, y) => setPos({ x, y }),
           onBounce: (axis) => {
             bounced = true
