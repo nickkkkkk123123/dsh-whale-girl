@@ -616,7 +616,7 @@ export function apply(ctx: any) {
     }
   })
 })()`
-    // 用 index-inject 事件注入桥接脚本（DSH Desktop 页面经 collectIndexInjections 生成，tapIndex 不生效）
+    // desktop：DSH Desktop 经 collectIndexInjections 用 index-inject
     ctx.on('webserver/index-inject', (table: any[]) => {
       const has = Array.isArray(table) && table.some(
         (row) => row && typeof row === 'object' && typeof row.text === 'string' && row.text.indexOf('__wgBridge') !== -1
@@ -626,5 +626,13 @@ export function apply(ctx: any) {
         table.push({ kind: 'script', placement: 'head', text: BRIDGE_JS })
       }
     })
+    // web：web profile 无 index-inject 事件，用 apiServer.tapIndex 注入桥接脚本到 </head> 前（幂等）
+    if (apiServer && typeof apiServer.tapIndex === 'function') {
+      apiServer.tapIndex((html: string) => {
+        if (html.indexOf('__wgBridge') !== -1) return html
+        diag('tap-index-called')
+        return html.replace('</head>', '<script>' + BRIDGE_JS + '</script></head>')
+      })
+    }
   }
 }

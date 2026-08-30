@@ -291,6 +291,28 @@ export function WhaleWidget() {
     }
   }, [])
 
+  // 兜底轮询：web/桥接未注入时直接拉 /dsh-whale-girl/api/state（每 60s + 挂载时），避免余额恒为 null
+  useEffect(() => {
+    let alive = true
+    const pull = () => {
+      fetch('/dsh-whale-girl/api/state', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!alive || !d || typeof d !== 'object') return
+          if (typeof (d as { balance?: unknown }).balance === 'number') {
+            setState((prev) => ({ ...prev, ...(d as WhaleState) }))
+          }
+        })
+        .catch(() => {})
+    }
+    pull()
+    const iv = window.setInterval(pull, 60000)
+    return () => {
+      alive = false
+      window.clearInterval(iv)
+    }
+  }, [])
+
   // 配置：从宿主 GET 加载（失败则保持本地配置）
   useEffect(() => {
     let alive = true
