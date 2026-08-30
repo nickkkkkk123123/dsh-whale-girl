@@ -78,10 +78,16 @@ export function WhaleWidget() {
     y: Math.max(0, window.innerHeight - WIDGET_H - 8)
   }))
   // 信息面板：独立窗口（默认跟随角色；距离超阈值或直接拖拽则脱离）
-  const [infoPos, setInfoPos] = useState<{ x: number; y: number }>(() => ({
-    x: window.innerWidth - 170,
-    y: window.innerHeight - 250
-  }))
+  const [infoPos, setInfoPos] = useState<{ x: number; y: number }>(() => {
+    const rw = window.innerWidth
+    const rh = window.innerHeight
+    const rx = rw - WIDGET_W - 8
+    const ry = rh - WIDGET_H - 8
+    return {
+      x: Math.max(8, Math.min(rw - INFO_W - 8, rx + WIDGET_W / 2 - INFO_W / 2)),
+      y: Math.max(8, Math.min(rh - INFO_H - 8, ry + WIDGET_H + 12))
+    }
+  })
   const [, setInfoMode] = useState<'follow' | 'free' | 'returning'>('follow')
   const [pressed, setPressed] = useState(false)
   const [dragging, setDragging] = useState(false)
