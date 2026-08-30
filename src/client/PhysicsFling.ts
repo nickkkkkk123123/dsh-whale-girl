@@ -52,9 +52,9 @@ export interface FlingOptions {
   onMove: (x: number, y: number) => void
   onBounce?: (axis: 'x' | 'y') => void
   onDone?: (x: number, y: number) => void
-  /** 障碍（信息面板）矩形；角色甩抛撞到它时角色反弹，并回调 onObstacleHit 让面板获得动量。 */
+  /** 障碍（信息面板）矩形；角色甩抛撞到它时角色反弹，并回调 onObstacleHit 让面板获得角色的入射动量。 */
   getObstacle?: () => { x: number; y: number; w: number; h: number } | null
-  onObstacleHit?: (nx: number, ny: number) => void
+  onObstacleHit?: (invx: number, invy: number) => void
 }
 
 const STOP_SPEED = 34
@@ -106,6 +106,8 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
       const ang = Math.atan2(ccy - ocy, ccx - ocx)
       const nx = Math.cos(ang)
       const ny = Math.sin(ang)
+      const invx = vx
+      const invy = vy
       const dot = vx * nx + vy * ny
       if (dot < 0) {
         vx = vx - 2 * dot * nx
@@ -113,7 +115,7 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
       }
       x = ocx + nx * (ob.w / 2 + opts.width / 2 + 2)
       y = ocy + ny * (ob.h / 2 + opts.height / 2 + 2)
-      opts.onObstacleHit?.(nx, ny)
+      opts.onObstacleHit?.(invx, invy)
     }
 
     const b = bounds()

@@ -481,10 +481,10 @@ export function WhaleWidget() {
     []
   )
   const getObstacle = useCallback(() => __wgInfoGlobal, [])
-  const handleObstacleHit = useCallback((nx: number, ny: number) => {
-    // 角色撞到面板：面板获得动量（被撞向 -法线方向）
+  const handleObstacleHit = useCallback((invx: number, invy: number) => {
+    // 角色撞到面板：面板获得角色入射动量（被撞飞，速度 = 角色速度 * 0.8）
     infoModeRef.current = 'free'
-    infoVelRef.current = { x: -nx * 6, y: -ny * 6 }
+    infoVelRef.current = { x: invx * 0.8, y: invy * 0.8 }
     freeStartRef.current = performance.now()
   }, [])
   const onInfoUp = useCallback(
