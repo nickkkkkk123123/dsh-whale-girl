@@ -304,7 +304,12 @@ export function WhaleWidget() {
       const dt = Math.max(0.001, Math.min(0.05, (now - last) / 1000))
       last = now
       const p = posRef.current
-      const anchor = { x: p.x + WIDGET_W / 2 - INFO_W / 2, y: p.y + WIDGET_H + 12 }
+      // 锚点=角色下方；角色太靠边时 clamp 进视口，避免信息面板跑出屏幕
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const cX = (v: number) => Math.max(8, Math.min(vw - INFO_W - 8, v))
+      const cY = (v: number) => Math.max(8, Math.min(vh - INFO_H - 8, v))
+      const anchor = { x: cX(p.x + WIDGET_W / 2 - INFO_W / 2), y: cY(p.y + WIDGET_H + 12) }
       if (infoModeRef.current === 'follow') {
         const k = 0.12
         const nx = infoPosRef.current.x + (anchor.x - infoPosRef.current.x) * k
