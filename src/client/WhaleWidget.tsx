@@ -345,6 +345,7 @@ export function WhaleWidget() {
   // 信息面板物理：滞后跟随角色；距离超阈值→独立（自由惯性+撞边界/角色反弹+倒计时）；超时→回归（角色静止则跟随）
   useEffect(() => {
     if (!config.showInfo) return
+    if (workState === 'thinking') return
     let last = performance.now()
     const step = (now: number) => {
       const dt = Math.max(0.001, Math.min(0.05, (now - last) / 1000))
@@ -471,7 +472,7 @@ export function WhaleWidget() {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [config.showInfo, config.followThreshold])
+  }, [config.showInfo, config.followThreshold, workState])
 
   // 右键菜单
   const onContextMenu = useCallback((e: React.MouseEvent) => {
