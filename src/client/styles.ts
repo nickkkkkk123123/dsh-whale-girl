@@ -273,6 +273,8 @@ export const WIDGET_CSS = `
   padding: 6px;
   box-shadow: 0 8px 28px rgba(30, 50, 120, 0.22);
   font-size: 13px;
+  max-height: 68vh;
+  overflow-y: auto;
   color: #2a3a66;
   user-select: none;
   backdrop-filter: blur(6px);

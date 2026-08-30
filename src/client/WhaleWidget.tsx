@@ -344,7 +344,6 @@ export function WhaleWidget() {
   // 信息面板物理：滞后跟随角色；距离超阈值→独立（自由惯性+撞边界/角色反弹+倒计时）；超时→回归（角色静止则跟随）
   useEffect(() => {
     if (!config.showInfo) return
-    let raf = 0
     let last = performance.now()
     const step = (now: number) => {
       const dt = Math.max(0.001, Math.min(0.05, (now - last) / 1000))
@@ -461,10 +460,10 @@ export function WhaleWidget() {
         iel.style.top = `${infoPosRef.current.y}px`
       }
       __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: INFO_W, h: INFO_H }
-      raf = requestAnimationFrame(step)
+      // 减负：改为低频调度（约 20fps），面板跟随/碰撞足够平滑，显著降 CPU
     }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
+    const iv = window.setInterval(() => step(performance.now()), 50)
+    return () => window.clearInterval(iv)
   }, [config.showInfo, config.followThreshold])
 
   // 右键菜单
