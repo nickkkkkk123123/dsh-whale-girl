@@ -51,7 +51,7 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   lowBalance: 10,
   showWorkState: true,
   realtimeBalance: false,
-  showInfo: true
+  showInfo: false
 }
 
 interface Props {

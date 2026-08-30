@@ -68,7 +68,7 @@ const DEFAULT_CONFIG: WidgetConfig = {
   lowBalance: 10,
   showWorkState: true,
   realtimeBalance: false,
-  showInfo: true
+  showInfo: false
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
