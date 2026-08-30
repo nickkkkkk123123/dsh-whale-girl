@@ -724,6 +724,9 @@ export function WhaleWidget() {
         middleModeRef.current = true
         slingOriginRef.current = { x: ox, y: oy }
         dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
+        // 中键弹弓：暂停角色漂浮动画（角色静止，弹弓稳）
+        const imgEl = el.querySelector('.wg-img') as HTMLElement | null
+        if (imgEl) imgEl.style.animationPlayState = 'paused'
         setSling({
           fx: ox + WIDGET_W / 2,
           fy: oy + WIDGET_H / 2,
@@ -794,6 +797,9 @@ export function WhaleWidget() {
       // 中键弹弓：松开时沿「原位置 → 当前位置」方向赋予动能抛掷
       if (middleModeRef.current) {
         middleModeRef.current = false
+        // 松开：恢复角色漂浮动画
+        const imgEl2 = rootRef.current?.querySelector('.wg-img') as HTMLElement | null
+        if (imgEl2) imgEl2.style.animationPlayState = 'running'
         const origin = slingOriginRef.current
         slingOriginRef.current = null
         const el = rootRef.current
