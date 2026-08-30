@@ -1000,7 +1000,7 @@ export function WhaleWidget() {
       {config.showInfo && (
         <div
           ref={infoElRef}
-          style={{ position: 'fixed', zIndex: 2147483646, ['--wg-frost' as any]: `${config.frost}px` }}
+          style={{ position: 'fixed', zIndex: 2147483646, ['--wg-frost' as any]: `${Math.min(config.frost, 8)}px` }}
           onPointerDown={onInfoDown}
           onPointerMove={onInfoMove}
           onPointerUp={onInfoUp}
