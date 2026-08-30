@@ -99,9 +99,7 @@ function normalizeConfig(o: unknown): MenuConfig {
     followThreshold: Number.isFinite(Number(any.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(any.followThreshold)))) : 180,
     infoFrost: Number.isFinite(Number(any.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(any.infoFrost)))) : 4,
     pauseOnThinking: any.pauseOnThinking !== false,
-    widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(any.widgetScale))) : 1,
-    infoScale: Number.isFinite(Number(any.infoScale)) ? Math.min(1.5, Math.max(0.6, Number(any.infoScale))) : 1,
-    linkScale: any.linkScale === true
+    widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(any.widgetScale))) : 1
   }
 }
 
@@ -117,14 +115,10 @@ function loadLocalConfig(): MenuConfig {
 
 export function WhaleWidget() {
   const rootRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
-    const w = WIDGET_W * config.widgetScale
-    const h = WIDGET_H * config.widgetScale
-    return {
-      x: Math.max(8, window.innerWidth - w - 8),
-      y: Math.max(8, window.innerHeight - h - INFO_H - 42)
-    }
-  })
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => ({
+    x: Math.max(8, window.innerWidth - WIDGET_W - 8),
+    y: Math.max(8, window.innerHeight - WIDGET_H - INFO_H - 42)
+  }))
   // 信息面板：独立窗口（默认跟随角色；距离超阈值或直接拖拽则脱离）
   const [infoPos] = useState<{ x: number; y: number }>(() => {
     const rw = window.innerWidth
@@ -467,7 +461,7 @@ export function WhaleWidget() {
       // 直接写 DOM（不每帧 setState，避免 60fps 全量 re-render 卡住渲染器导致 boot 失败）
       const iel = infoElRef.current
       if (iel) {
-        iel.style.transform = `translate3d(${infoPosRef.current.x}px,${infoPosRef.current.y}px,0) scale(${config.linkScale ? config.widgetScale : config.infoScale})`
+        iel.style.transform = `translate3d(${infoPosRef.current.x}px,${infoPosRef.current.y}px,0)`
       }
       __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: INFO_W, h: INFO_H }
       // 减负：改为低频调度（约 20fps），面板跟随/碰撞足够平滑，显著降 CPU
@@ -480,7 +474,7 @@ export function WhaleWidget() {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [config.showInfo, config.followThreshold, workState, config.pauseOnThinking, config.infoScale, config.linkScale, config.widgetScale])
+  }, [config.showInfo, config.followThreshold, workState, config.pauseOnThinking])
 
   // 右键菜单
   const onContextMenu = useCallback((e: React.MouseEvent) => {
@@ -538,7 +532,7 @@ export function WhaleWidget() {
         infoVelRef.current = { x: 0, y: 0 }
       }
       if (infoElRef.current) {
-        infoElRef.current.style.transform = `translate3d(${nx}px,${ny}px,0) scale(${config.linkScale ? config.widgetScale : config.infoScale})`
+        infoElRef.current.style.transform = `translate3d(${nx}px,${ny}px,0)`
       }
       // 拖拽面板撞到静止/吸附角色 → 角色获得动量（被撞飞）
       if (!dragging && !flinging) {
@@ -582,7 +576,7 @@ export function WhaleWidget() {
         }
       }
     },
-    [config.infoScale, config.linkScale, config.widgetScale]
+    []
   )
   const getObstacle = useCallback(() => __wgInfoGlobal, [])
   const handleObstacleHit = useCallback((invx: number, invy: number) => {
@@ -638,14 +632,12 @@ export function WhaleWidget() {
   }, [providers, switching])
 
   const resetPosition = useCallback(() => {
-    const w = WIDGET_W * config.widgetScale
-    const h = WIDGET_H * config.widgetScale
     setPos({
-      x: Math.max(8, window.innerWidth - w - 8),
-      y: Math.max(8, window.innerHeight - h - INFO_H - 42)
+      x: Math.max(8, window.innerWidth - WIDGET_W - 8),
+      y: Math.max(8, window.innerHeight - WIDGET_H - INFO_H - 42)
     })
     setMenu(null)
-  }, [config.widgetScale])
+  }, [])
 
   const stopFling = useCallback(() => {
     if (flingRef.current) {

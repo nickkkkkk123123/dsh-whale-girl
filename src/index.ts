@@ -63,10 +63,6 @@ export interface WidgetConfig {
   pauseOnThinking: boolean
   /** 挂件整体缩放（visual scale），0.6~1.5 默认 1 */
   widgetScale: number
-  /** 信息面板大小（visual scale），0.6~1.5 默认 1；若锁定同步则跟随挂件大小 */
-  infoScale: number
-  /** 锁定角色与面板大小同步（面板大小=挂件大小） */
-  linkScale: boolean
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -86,9 +82,7 @@ const DEFAULT_CONFIG: WidgetConfig = {
   followThreshold: 180,
   infoFrost: 4,
   pauseOnThinking: true,
-  widgetScale: 1,
-  infoScale: 1,
-  linkScale: false
+  widgetScale: 1
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -111,9 +105,7 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     followThreshold: Number.isFinite(Number(o.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(o.followThreshold)))) : 180,
     infoFrost: Number.isFinite(Number(o.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(o.infoFrost)))) : 4,
     pauseOnThinking: o.pauseOnThinking !== false,
-    widgetScale: Number.isFinite(Number(o.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(o.widgetScale))) : 1,
-    infoScale: Number.isFinite(Number(o.infoScale)) ? Math.min(1.5, Math.max(0.6, Number(o.infoScale))) : 1,
-    linkScale: o.linkScale === true
+    widgetScale: Number.isFinite(Number(o.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(o.widgetScale))) : 1
   }
 }
 
