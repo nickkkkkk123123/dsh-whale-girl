@@ -403,6 +403,7 @@ export const WIDGET_CSS = `
 /* 信息面板：时间/日期 + 系统资源 */
 .wg-info {
   width: 132px;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(74, 108, 247, 0.28);
   border-radius: 10px;
