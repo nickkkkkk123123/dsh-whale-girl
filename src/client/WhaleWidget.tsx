@@ -573,12 +573,11 @@ export function WhaleWidget() {
   const snap = useCallback((x: number, y: number) => {
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const cx = x + WIDGET_W / 2
     const px = Math.max(8, Math.min(vw - WIDGET_W - 8, x))
     const py = Math.max(8, Math.min(vh - WIDGET_H - 8, y))
-    // 角色中心距最近水平边超过阈值 → 屏幕中间自由状态，不吸附边缘
-    const minDist = Math.min(cx, vw - cx)
-    if (minDist > EDGE_SNAP_MARGIN) {
+    // 用角色窗口边缘距最近水平边判断（角色贴边才吸附，不因角色宽而误判）
+    const edgeDist = Math.min(x, vw - (x + WIDGET_W))
+    if (edgeDist > EDGE_SNAP_MARGIN) {
       setPos({ x: px, y: py })
       return
     }
