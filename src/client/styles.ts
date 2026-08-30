@@ -400,4 +400,29 @@ export const WIDGET_CSS = `
 .wg-eco .wg-context {
   backdrop-filter: none;
 }
+/* 信息面板：时间/日期 + 系统资源 */
+.wg-info {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 132px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(74, 108, 247, 0.28);
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: #1f2c4d;
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 4px 16px rgba(30, 50, 120, 0.15);
+  text-align: left;
+  z-index: 10000;
+  pointer-events: none;
+}
+.wg-info-time { font-size: 15px; font-weight: 700; color: #2a3a66; text-align: center; }
+.wg-info-date { font-size: 10px; color: #7c8ab5; text-align: center; margin-bottom: 4px; }
+.wg-info-row { display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.wg-info-label { width: 24px; color: #5a6a99; font-weight: 600; flex: none; }
+.wg-info-bar { flex: 1; height: 5px; background: rgba(80, 110, 190, 0.15); border-radius: 3px; overflow: hidden; }
+.wg-info-fill { height: 100%; background: linear-gradient(90deg, #4a6cf7, #7aa2ff); border-radius: 3px; transition: width 400ms ease; }
+.wg-info-val { font-size: 10px; color: #2a3a66; font-weight: 600; white-space: nowrap; }
 `

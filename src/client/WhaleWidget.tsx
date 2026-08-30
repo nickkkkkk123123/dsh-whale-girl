@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react'
 import { WIDGET_CSS } from './styles'
 import { ContextBar, WhaleState } from './ContextBar'
 import { Bubble } from './Bubble'
+import { InfoPanel } from './InfoPanel'
 import { EasterEgg } from './EasterEgg'
 import { pickRandomIdleLine } from './quotes'
 import { SoundEngine } from './SoundEngine'
@@ -19,7 +20,8 @@ const EMPTY_STATE: WhaleState = {
   contextLimit: 128000,
   lastTurnCost: null,
   peakLow: null,
-  subagentRunning: 0
+  subagentRunning: 0,
+  sysInfo: { memPct: 0, memUsed: 0, memTotal: 0, cpu: 0 }
 }
 
 /** 本地兜底配置 key（宿主 api/config 不可达时使用）。 */
@@ -48,7 +50,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     panelOpacity: Number.isFinite(Number(any.panelOpacity)) ? Math.min(1, Math.max(0.2, Number(any.panelOpacity))) : 0.82,
     lowBalance: Number.isFinite(Number(any.lowBalance)) ? Math.max(0, Number(any.lowBalance)) : 10,
     showWorkState: any.showWorkState !== false,
-    realtimeBalance: any.realtimeBalance === true
+    realtimeBalance: any.realtimeBalance === true,
+    showInfo: any.showInfo !== false
   }
 }
 
@@ -705,6 +708,9 @@ export function WhaleWidget() {
             showBalance={config.showBalance}
             showPeak={config.showPeak}
           />
+        )}
+        {config.showInfo && (
+          <InfoPanel sys={state.sysInfo} />
         )}
         {config.showBubble && bubble && (
           <Bubble

@@ -51,6 +51,8 @@ export interface WidgetConfig {
   showWorkState: boolean
   /** 实时余额刷新：开启后余额/用量按约 10 秒刷新（默认 60 秒，比 whale-widget 更实时） */
   realtimeBalance: boolean
+  /** 是否显示信息面板（时间/系统资源） */
+  showInfo: boolean
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -65,7 +67,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   panelOpacity: 0.82,
   lowBalance: 10,
   showWorkState: true,
-  realtimeBalance: false
+  realtimeBalance: false,
+  showInfo: true
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -83,7 +86,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     panelOpacity: Number.isFinite(Number(o.panelOpacity)) ? Math.min(1, Math.max(0.2, Number(o.panelOpacity))) : 0.82,
     lowBalance: Number.isFinite(Number(o.lowBalance)) ? Math.max(0, Number(o.lowBalance)) : 10,
     showWorkState: o.showWorkState !== false,
-    realtimeBalance: o.realtimeBalance === true
+    realtimeBalance: o.realtimeBalance === true,
+    showInfo: o.showInfo !== false
   }
 }
 
@@ -342,7 +346,29 @@ export function apply(ctx: any) {
       lastTurnCost,
       peakLow: peak,
       refreshMs: widgetConfig.realtimeBalance ? 10000 : 60000,
-      subagentRunning
+      subagentRunning,
+      sysInfo: readSys()
+    }
+  }
+
+  /** 系统资源：内存（os 准确）+ CPU（loadavg 近似，避免引入笨重 sysinfo 依赖）。 */
+  function readSys(): { memPct: number; memUsed: number; memTotal: number; cpu: number } {
+    try {
+      const total = os.totalmem()
+      const free = os.freemem()
+      const used = total - free
+      const memPct = total > 0 ? Math.round((used / total) * 100) : 0
+      const load = os.loadavg()[0]
+      const cpus = os.cpus().length
+      const cpu = Math.min(100, Math.round((load / Math.max(1, cpus)) * 100))
+      return {
+        memPct,
+        memUsed: Math.round((used / 1024 ** 3) * 10) / 10,
+        memTotal: Math.round((total / 1024 ** 3) * 10) / 10,
+        cpu
+      }
+    } catch {
+      return { memPct: 0, memUsed: 0, memTotal: 0, cpu: 0 }
     }
   }
 

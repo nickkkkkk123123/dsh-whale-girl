@@ -11,6 +11,8 @@ export interface WhaleState {
   peakLow: 'high' | 'low' | null
   /** 活跃子代理（分身）数量，来自 host jobs 服务 */
   subagentRunning: number
+  /** 系统资源（内存/CPU），来自 host 信息面板 */
+  sysInfo: { memPct: number; memUsed: number; memTotal: number; cpu: number }
 }
 
 interface Props {

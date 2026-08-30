@@ -21,6 +21,8 @@ export interface MenuConfig {
   showWorkState: boolean
   /** 实时余额刷新（10 秒，默认关闭用 60 秒） */
   realtimeBalance: boolean
+  /** 是否显示信息面板（时间/系统资源） */
+  showInfo: boolean
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -48,7 +50,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   panelOpacity: 0.82,
   lowBalance: 10,
   showWorkState: true,
-  realtimeBalance: false
+  realtimeBalance: false,
+  showInfo: true
 }
 
 interface Props {
@@ -196,6 +199,9 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ showPeak: !config.showPeak })}>
         <span className={`wg-menu-check${config.showPeak ? ' on' : ''}`} /> 峰谷提醒
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ showInfo: !config.showInfo })}>
+        <span className={`wg-menu-check${config.showInfo ? ' on' : ''}`} /> 信息面板
       </div>
       <div className="wg-menu-item" onClick={() => set({ ecoMode: !config.ecoMode })}>
         <span className={`wg-menu-check${config.ecoMode ? ' on' : ''}`} /> 省电模式（空闲暂停动画）
