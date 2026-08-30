@@ -669,10 +669,21 @@ export function WhaleWidget() {
       return
     }
     trackerRef.current.push(e.clientX, e.clientY)
-    setPos({
-      x: Math.max(0, Math.min(window.innerWidth - WIDGET_W, e.clientX - dragRef.current.dx)),
-      y: Math.max(0, Math.min(window.innerHeight - WIDGET_H, e.clientY - dragRef.current.dy))
-    })
+    let nx = Math.max(0, Math.min(window.innerWidth - WIDGET_W, e.clientX - dragRef.current.dx))
+    let ny = Math.max(0, Math.min(window.innerHeight - WIDGET_H, e.clientY - dragRef.current.dy))
+    // 拖拽角色撞到信息面板：角色被挡回（沿面板中心-角色中心法线推到面板外，不能压穿）
+    const ob = __wgInfoGlobal
+    if (ob && nx < ob.x + ob.w && nx + WIDGET_W > ob.x && ny < ob.y + ob.h && ny + WIDGET_H > ob.y) {
+      const ccx = nx + WIDGET_W / 2
+      const ccy = ny + WIDGET_H / 2
+      const ocx = ob.x + ob.w / 2
+      const ocy = ob.y + ob.h / 2
+      const ang = Math.atan2(ccy - ocy, ccx - ocx)
+      const d = Math.max(ob.w, ob.h) / 2 + Math.max(WIDGET_W, WIDGET_H) / 2 + 2
+      nx = Math.max(0, Math.min(window.innerWidth - WIDGET_W, ocx + Math.cos(ang) * d))
+      ny = Math.max(0, Math.min(window.innerHeight - WIDGET_H, ocy + Math.sin(ang) * d))
+    }
+    setPos({ x: nx, y: ny })
   }, [markActive])
 
   const onPointerUp = useCallback(
