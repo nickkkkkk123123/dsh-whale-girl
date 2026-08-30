@@ -56,6 +56,23 @@ export const WIDGET_CSS = `
 .wg-workstate.wg-ws-done {
   background: #2f9d5f;
 }
+/* 活跃子代理（分身）徽章 */
+.wg-subagent {
+  position: absolute;
+  right: 4px;
+  top: 2px;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 9px;
+  z-index: 10001;
+  box-shadow: 0 2px 8px rgba(30, 50, 120, 0.28);
+  animation: wg-pop 180ms ease-out;
+  pointer-events: none;
+  white-space: nowrap;
+}
 .wg-img {
   width: 100%;
   height: 76%;

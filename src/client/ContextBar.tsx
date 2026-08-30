@@ -9,6 +9,8 @@ export interface WhaleState {
   contextLimit: number
   lastTurnCost: number | null
   peakLow: 'high' | 'low' | null
+  /** 活跃子代理（分身）数量，来自 host jobs 服务 */
+  subagentRunning: number
 }
 
 interface Props {

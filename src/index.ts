@@ -136,6 +136,8 @@ export function apply(ctx: any) {
   let cachedBalance: number | null = null
   let cachedCurrency = 'CNY'
   let lastTurnCost: number | null = null
+  // 活跃子代理（分身的 running 计数），由 jobs 服务回调维护（装 subagent bundle 后生效）
+  let subagentRunning = 0
   // 当前活跃会话（turn-stopping 时记录；ctx.sessions.list()[0] 不稳定）
   let currentSession: any = null
   // 缓存最近一次成功获取的会话，避免 buildState 轮询时会话引用短暂丢失导致上下文闪 0
@@ -203,6 +205,37 @@ export function apply(ctx: any) {
     }, ms)
   }
   scheduleBalance()
+
+  // 子代理状态感知：统计主 agent 的 running subagent（kind=subagent，status=running/stopping）。
+  // 用主 agent 作为 caller 调 jobs.list（caller 相对围栏），回调触发即重算；纯本地、零 API 开销。
+  const subagentJobs = ctx.get('jobs')
+  const recountSubagents = () => {
+    try {
+      const agent = ctx.agents?.roots?.()[0] ?? ctx.agents?.list?.()[0]
+      if (!subagentJobs || !agent || typeof subagentJobs.list !== 'function') return
+      const snaps = (subagentJobs.list(agent) ?? []) as Array<Record<string, unknown>>
+      let n = 0
+      for (const s of snaps) {
+        if (s && s.kind === 'subagent' && (s.status === 'running' || s.status === 'stopping')) n++
+      }
+      if (n !== subagentRunning) {
+        subagentRunning = n
+        diag(`subagents: ${n}`)
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (subagentJobs) {
+    if (typeof subagentJobs.onJobsChanged === 'function') subagentJobs.onJobsChanged(() => recountSubagents())
+    if (typeof subagentJobs.onJobDone === 'function') subagentJobs.onJobDone(() => recountSubagents())
+    if (ctx.on) {
+      ctx.on('subagent/start', () => recountSubagents())
+      ctx.on('subagent/end', () => recountSubagents())
+    }
+    recountSubagents()
+    setTimeout(recountSubagents, 3000) // 启动后兜底
+  }
 
   // 事件流：任意会话事件都更新当前活跃会话引用（whale-widget 同款方式，重启后会话恢复也能拿到）
   ctx.on('session/event', (session: any) => {
@@ -308,7 +341,8 @@ export function apply(ctx: any) {
       contextLimit: DEFAULT_CONTEXT_LIMIT,
       lastTurnCost,
       peakLow: peak,
-      refreshMs: widgetConfig.realtimeBalance ? 10000 : 60000
+      refreshMs: widgetConfig.realtimeBalance ? 10000 : 60000,
+      subagentRunning
     }
   }
 

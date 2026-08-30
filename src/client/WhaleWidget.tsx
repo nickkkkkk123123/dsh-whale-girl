@@ -18,7 +18,8 @@ const EMPTY_STATE: WhaleState = {
   contextTokens: 0,
   contextLimit: 128000,
   lastTurnCost: null,
-  peakLow: null
+  peakLow: null,
+  subagentRunning: 0
 }
 
 /** 本地兜底配置 key（宿主 api/config 不可达时使用）。 */
@@ -681,6 +682,9 @@ export function WhaleWidget() {
           <div className={`wg-workstate${workState === 'done' ? ' wg-ws-done' : ''}`} key={workState}>
             {workState === 'thinking' ? '思考中…' : '搞定啦！'}
           </div>
+        )}
+        {config.showWorkState && state.subagentRunning > 0 && (
+          <div className="wg-subagent">分身×{state.subagentRunning}</div>
         )}
         <img className="wg-img" src={imgSrc || '/dsh-whale-girl/whale-girl.png'} alt="鲸鱼娘" draggable={false} />
         {petted && (
