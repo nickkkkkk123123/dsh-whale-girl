@@ -99,7 +99,9 @@ function normalizeConfig(o: unknown): MenuConfig {
     followThreshold: Number.isFinite(Number(any.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(any.followThreshold)))) : 180,
     infoFrost: Number.isFinite(Number(any.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(any.infoFrost)))) : 4,
     pauseOnThinking: any.pauseOnThinking !== false,
-    widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(any.widgetScale))) : 1
+    widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(any.widgetScale))) : 1,
+    infoScale: Number.isFinite(Number(any.infoScale)) ? Math.min(1.5, Math.max(0.6, Number(any.infoScale))) : 1,
+    linkScale: any.linkScale === true
   }
 }
 
@@ -461,7 +463,7 @@ export function WhaleWidget() {
       // 直接写 DOM（不每帧 setState，避免 60fps 全量 re-render 卡住渲染器导致 boot 失败）
       const iel = infoElRef.current
       if (iel) {
-        iel.style.transform = `translate3d(${infoPosRef.current.x}px,${infoPosRef.current.y}px,0)`
+        iel.style.transform = `translate3d(${infoPosRef.current.x}px,${infoPosRef.current.y}px,0) scale(${config.linkScale ? config.widgetScale : config.infoScale})`
       }
       __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: INFO_W, h: INFO_H }
       // 减负：改为低频调度（约 20fps），面板跟随/碰撞足够平滑，显著降 CPU
@@ -532,7 +534,7 @@ export function WhaleWidget() {
         infoVelRef.current = { x: 0, y: 0 }
       }
       if (infoElRef.current) {
-        infoElRef.current.style.transform = `translate3d(${nx}px,${ny}px,0)`
+        infoElRef.current.style.transform = `translate3d(${nx}px,${ny}px,0) scale(${config.linkScale ? config.widgetScale : config.infoScale})`
       }
       // 拖拽面板撞到静止/吸附角色 → 角色获得动量（被撞飞）
       if (!dragging && !flinging) {

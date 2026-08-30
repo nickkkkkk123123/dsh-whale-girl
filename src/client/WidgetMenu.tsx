@@ -31,6 +31,10 @@ export interface MenuConfig {
   pauseOnThinking: boolean
   /** 挂件整体缩放（visual scale），0.6~1.5 默认 1 */
   widgetScale: number
+  /** 信息面板大小（visual scale），0.6~1.5 默认 1；锁定同步则跟随挂件大小 */
+  infoScale: number
+  /** 锁定角色与面板大小同步（面板大小=挂件大小） */
+  linkScale: boolean
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -63,7 +67,9 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   followThreshold: 180,
   infoFrost: 4,
   pauseOnThinking: true,
-  widgetScale: 1
+  widgetScale: 1,
+  infoScale: 1,
+  linkScale: false
 }
 
 interface Props {
@@ -270,6 +276,25 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
           onChange={(e) => set({ widgetScale: Number(e.target.value) })}
           title="挂件整体大小（60%~150%，默认100%）"
         />
+      </div>
+      <div className="wg-menu-title">
+        面板大小 <span className="wg-menu-power">{Math.round((config.linkScale ? config.widgetScale : config.infoScale) * 100)}%</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={0.6}
+          max={1.5}
+          step={0.05}
+          value={config.linkScale ? config.widgetScale : config.infoScale}
+          onChange={(e) => set({ infoScale: Number(e.target.value) })}
+          disabled={config.linkScale}
+          title="信息面板大小（60%~150%，默认100%；锁定时随挂件）"
+        />
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ linkScale: !config.linkScale })}>
+        <span className={`wg-menu-check${config.linkScale ? ' on' : ''}`} /> 锁定角色与面板大小同步
       </div>
       <div className="wg-menu-divider" />
       <div className="wg-menu-item" onClick={onResetPosition}>↺ 恢复默认位置</div>
