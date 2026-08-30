@@ -39,6 +39,8 @@ const INFO_W = 132
 const INFO_H = 66
 /** 信息面板圆角矩形碰撞箱的圆角半径（与视觉 border-radius 一致）。 */
 const INFO_RADIUS = 10
+/** 角色中心距屏幕水平边超过该值则不吸附（屏幕中间保持自由状态）。 */
+const EDGE_SNAP_MARGIN = 120
 /** 信息面板独立状态维持时长（ms），之后尝试回归。 */
 const FREE_MS = 4000
 /** 信息面板当前矩形（共享给角色甩抛做障碍反馈）。 */
@@ -570,9 +572,18 @@ export function WhaleWidget() {
   /** 弹跳结束后：平滑吸附到最近侧边（保留当前垂直位置）。 */
   const snap = useCallback((x: number, y: number) => {
     const vw = window.innerWidth
+    const vh = window.innerHeight
+    const cx = x + WIDGET_W / 2
+    const px = Math.max(8, Math.min(vw - WIDGET_W - 8, x))
+    const py = Math.max(8, Math.min(vh - WIDGET_H - 8, y))
+    // 角色中心距最近水平边超过阈值 → 屏幕中间自由状态，不吸附边缘
+    const minDist = Math.min(cx, vw - cx)
+    if (minDist > EDGE_SNAP_MARGIN) {
+      setPos({ x: px, y: py })
+      return
+    }
     const left = x + WIDGET_W / 2 < vw / 2 ? 8 : vw - WIDGET_W - 8
-    const top = Math.max(8, Math.min(window.innerHeight - WIDGET_H - 8, y))
-    setPos({ x: Math.max(8, left), y: top })
+    setPos({ x: Math.max(8, left), y: Math.max(8, Math.min(vh - WIDGET_H - 8, y)) })
   }, [])
 
   // 交互诊断上报：通过 postMessage 发给页面顶层 bridge，由 bridge 用带认证的 fetch 上报宿主写日志
