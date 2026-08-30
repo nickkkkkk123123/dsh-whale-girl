@@ -46,7 +46,8 @@ export const WIDGET_CSS = `
   font-weight: 700;
   border-radius: 999px;
   padding: 2px 9px;
-  z-index: 3;
+  /* 高于摸头动画(z-index:10000)：确保思考/完成徽章不被摸头覆盖 */
+  z-index: 10001;
   box-shadow: 0 2px 8px rgba(30, 50, 120, 0.28);
   animation: wg-pop 180ms ease-out;
   pointer-events: none;
