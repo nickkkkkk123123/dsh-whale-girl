@@ -29,6 +29,8 @@ export interface MenuConfig {
   infoFrost: number
   /** DSH 输出/思考（thinking）时是否暂停信息面板物理循环（省主线程，默认开） */
   pauseOnThinking: boolean
+  /** 挂件整体缩放（visual scale），0.6~1.5 默认 1 */
+  widgetScale: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -60,7 +62,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   showInfo: false,
   followThreshold: 180,
   infoFrost: 4,
-  pauseOnThinking: true
+  pauseOnThinking: true,
+  widgetScale: 1
 }
 
 interface Props {
@@ -252,6 +255,21 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ showWorkState: !config.showWorkState })}>
         <span className={`wg-menu-check${config.showWorkState ? ' on' : ''}`} /> 工作状态徽章
+      </div>
+      <div className="wg-menu-title">
+        挂件大小 <span className="wg-menu-power">{Math.round(config.widgetScale * 100)}%</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={0.6}
+          max={1.5}
+          step={0.05}
+          value={config.widgetScale}
+          onChange={(e) => set({ widgetScale: Number(e.target.value) })}
+          title="挂件整体大小（60%~150%，默认100%）"
+        />
       </div>
       <div className="wg-menu-divider" />
       <div className="wg-menu-item" onClick={onResetPosition}>↺ 恢复默认位置</div>

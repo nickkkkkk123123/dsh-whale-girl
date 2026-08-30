@@ -98,7 +98,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     showInfo: any.showInfo !== false,
     followThreshold: Number.isFinite(Number(any.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(any.followThreshold)))) : 180,
     infoFrost: Number.isFinite(Number(any.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(any.infoFrost)))) : 4,
-    pauseOnThinking: any.pauseOnThinking !== false
+    pauseOnThinking: any.pauseOnThinking !== false,
+    widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(any.widgetScale))) : 1
   }
 }
 
@@ -1005,7 +1006,7 @@ export function WhaleWidget() {
           {
             left: 0,
             top: 0,
-            transform: `translate3d(${pos.x}px,${pos.y}px,0)${pressed ? ' scaleY(0.9)' : ''}`,
+            transform: `translate3d(${pos.x}px,${pos.y}px,0) scale(${config.widgetScale})${pressed ? ' scaleY(0.9)' : ''}`,
             '--wg-frost': config.frost,
             '--wg-panel-alpha': config.panelOpacity
           } as React.CSSProperties
