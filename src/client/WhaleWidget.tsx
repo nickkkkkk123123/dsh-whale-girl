@@ -457,8 +457,7 @@ export function WhaleWidget() {
       // 直接写 DOM（不每帧 setState，避免 60fps 全量 re-render 卡住渲染器导致 boot 失败）
       const iel = infoElRef.current
       if (iel) {
-        iel.style.left = `${infoPosRef.current.x}px`
-        iel.style.top = `${infoPosRef.current.y}px`
+        iel.style.transform = `translate3d(${infoPosRef.current.x}px,${infoPosRef.current.y}px,0)`
       }
       __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: INFO_W, h: INFO_H }
       // 减负：改为低频调度（约 20fps），面板跟随/碰撞足够平滑，显著降 CPU
@@ -529,8 +528,7 @@ export function WhaleWidget() {
         infoVelRef.current = { x: 0, y: 0 }
       }
       if (infoElRef.current) {
-        infoElRef.current.style.left = `${nx}px`
-        infoElRef.current.style.top = `${ny}px`
+        infoElRef.current.style.transform = `translate3d(${nx}px,${ny}px,0)`
       }
       // 拖拽面板撞到静止/吸附角色 → 角色获得动量（被撞飞）
       if (!dragging && !flinging) {
@@ -996,9 +994,9 @@ export function WhaleWidget() {
         className={`wg-root${dragging ? ' wg-dragging' : ''}${flinging ? ' wg-flinging' : ''}${bounce ? ' wg-bounce' : ''}${bounceAxis === 'x' ? ' wg-squash-x' : ''}${bounceAxis === 'y' ? ' wg-squash-y' : ''}${petted ? ' wg-pet' : ''}${config.ecoMode && ecoIdle ? ' wg-eco' : ''}${pos.x + WIDGET_W / 2 < window.innerWidth / 2 ? ' wg-flip' : ''}`}
         style={
           {
-            left: pos.x,
-            top: pos.y,
-            transform: pressed ? 'scaleY(0.9)' : undefined,
+            left: 0,
+            top: 0,
+            transform: `translate3d(${pos.x}px,${pos.y}px,0)${pressed ? ' scaleY(0.9)' : ''}`,
             '--wg-frost': config.frost,
             '--wg-panel-alpha': config.panelOpacity
           } as React.CSSProperties
