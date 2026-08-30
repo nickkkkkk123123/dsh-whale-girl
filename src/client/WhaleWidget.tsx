@@ -395,10 +395,11 @@ export function WhaleWidget() {
             infoPosRef.current.x = cX(infoPosRef.current.x + n.x * (n.depth + 2))
             infoPosRef.current.y = cY(infoPosRef.current.y + n.y * (n.depth + 2))
             const dot = infoVelRef.current.x * n.x + infoVelRef.current.y * n.y
-            if (dot < 0) {
-              infoVelRef.current = { x: infoVelRef.current.x - 2 * dot * n.x, y: infoVelRef.current.y - 2 * dot * n.y }
-            } else {
-              infoVelRef.current = { x: -infoVelRef.current.x, y: -infoVelRef.current.y }
+            // 标准反射（保持能量）；面板撞角色后至少沿法线弹开，避免特定速度/角度下卡停
+            infoVelRef.current = { x: infoVelRef.current.x - 2 * dot * n.x, y: infoVelRef.current.y - 2 * dot * n.y }
+            const sp = Math.hypot(infoVelRef.current.x, infoVelRef.current.y)
+            if (sp < 40) {
+              infoVelRef.current = { x: n.x * 60, y: n.y * 60 }
             }
             // 对称：角色静止被面板撞到 → 角色进入甩抛（被撞飞，带面板动量）
             if (!dragging && !flinging) {
