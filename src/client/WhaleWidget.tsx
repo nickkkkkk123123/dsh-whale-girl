@@ -97,7 +97,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     realtimeBalance: any.realtimeBalance === true,
     showInfo: any.showInfo !== false,
     followThreshold: Number.isFinite(Number(any.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(any.followThreshold)))) : 180,
-    infoFrost: Number.isFinite(Number(any.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(any.infoFrost)))) : 4
+    infoFrost: Number.isFinite(Number(any.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(any.infoFrost)))) : 4,
+    pauseOnThinking: any.pauseOnThinking !== false
   }
 }
 
@@ -345,7 +346,7 @@ export function WhaleWidget() {
   // 信息面板物理：滞后跟随角色；距离超阈值→独立（自由惯性+撞边界/角色反弹+倒计时）；超时→回归（角色静止则跟随）
   useEffect(() => {
     if (!config.showInfo) return
-    if (workState === 'thinking') return
+    if (config.pauseOnThinking && workState === 'thinking') return
     let last = performance.now()
     const step = (now: number) => {
       const dt = Math.max(0.001, Math.min(0.05, (now - last) / 1000))
@@ -472,7 +473,7 @@ export function WhaleWidget() {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [config.showInfo, config.followThreshold, workState])
+  }, [config.showInfo, config.followThreshold, workState, config.pauseOnThinking])
 
   // 右键菜单
   const onContextMenu = useCallback((e: React.MouseEvent) => {

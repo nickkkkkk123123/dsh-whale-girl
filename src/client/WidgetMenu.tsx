@@ -27,6 +27,8 @@ export interface MenuConfig {
   followThreshold: number
   /** 信息面板高斯模糊强度（backdrop-filter blur，0=关闭），0~16 默认 4；与进度条独立 */
   infoFrost: number
+  /** DSH 输出/思考（thinking）时是否暂停信息面板物理循环（省主线程，默认开） */
+  pauseOnThinking: boolean
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -57,7 +59,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   realtimeBalance: false,
   showInfo: false,
   followThreshold: 180,
-  infoFrost: 4
+  infoFrost: 4,
+  pauseOnThinking: true
 }
 
 interface Props {
@@ -240,6 +243,9 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ showInfo: !config.showInfo })}>
         <span className={`wg-menu-check${config.showInfo ? ' on' : ''}`} /> 信息面板
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ pauseOnThinking: !config.pauseOnThinking })}>
+        <span className={`wg-menu-check${config.pauseOnThinking ? ' on' : ''}`} /> 思考时暂停信息面板
       </div>
       <div className="wg-menu-item" onClick={() => set({ ecoMode: !config.ecoMode })}>
         <span className={`wg-menu-check${config.ecoMode ? ' on' : ''}`} /> 省电模式（空闲暂停动画）

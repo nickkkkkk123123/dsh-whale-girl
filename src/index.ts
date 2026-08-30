@@ -59,6 +59,8 @@ export interface WidgetConfig {
   followThreshold: number
   /** 信息面板高斯模糊强度（backdrop-filter blur，0=关闭），0~16 默认 4；与进度条 frost 独立 */
   infoFrost: number
+  /** DSH 输出/思考（thinking）时是否暂停信息面板物理循环（省主线程，默认开） */
+  pauseOnThinking: boolean
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -76,7 +78,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   realtimeBalance: false,
   showInfo: false,
   followThreshold: 180,
-  infoFrost: 4
+  infoFrost: 4,
+  pauseOnThinking: true
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -97,7 +100,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     realtimeBalance: o.realtimeBalance === true,
     showInfo: o.showInfo !== false,
     followThreshold: Number.isFinite(Number(o.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(o.followThreshold)))) : 180,
-    infoFrost: Number.isFinite(Number(o.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(o.infoFrost)))) : 4
+    infoFrost: Number.isFinite(Number(o.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(o.infoFrost)))) : 4,
+    pauseOnThinking: o.pauseOnThinking !== false
   }
 }
 
