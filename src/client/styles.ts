@@ -402,9 +402,6 @@ export const WIDGET_CSS = `
 }
 /* 信息面板：时间/日期 + 系统资源 */
 .wg-info {
-  position: absolute;
-  right: 4px;
-  top: 4px;
   width: 132px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(74, 108, 247, 0.28);
@@ -416,7 +413,7 @@ export const WIDGET_CSS = `
   box-shadow: 0 4px 16px rgba(30, 50, 120, 0.15);
   text-align: left;
   z-index: 10000;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .wg-info-time { font-size: 15px; font-weight: 700; color: #2a3a66; text-align: center; }
 .wg-info-date { font-size: 10px; color: #7c8ab5; text-align: center; margin-bottom: 4px; }
