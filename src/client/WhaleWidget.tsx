@@ -37,29 +37,41 @@ const FLING_SPEED = 800
 /** 信息面板（独立窗口）尺寸。 */
 const INFO_W = 132
 const INFO_H = 66
+/** 信息面板圆角矩形碰撞箱的圆角半径（与视觉 border-radius 一致）。 */
+const INFO_RADIUS = 10
 /** 信息面板独立状态维持时长（ms），之后尝试回归。 */
 const FREE_MS = 4000
 /** 信息面板当前矩形（共享给角色甩抛做障碍反馈）。 */
 let __wgInfoGlobal: { x: number; y: number; w: number; h: number } | null = null
 /** 矩形(rx,ry,rw,rh) 与圆(cx,cy,cr) 是否相交。 */
 function circleRectHit(rx: number, ry: number, rw: number, rh: number, cx: number, cy: number, cr: number): boolean {
-  const nx = Math.max(rx, Math.min(cx, rx + rw))
-  const ny = Math.max(ry, Math.min(cy, ry + rh))
+  // 面板用圆角核矩形（四角内缩圆角半径）近似圆角矩形碰撞箱
+  const ix = rx + INFO_RADIUS
+  const iy = ry + INFO_RADIUS
+  const iw = rw - 2 * INFO_RADIUS
+  const ih = rh - 2 * INFO_RADIUS
+  const nx = Math.max(ix, Math.min(cx, ix + iw))
+  const ny = Math.max(iy, Math.min(cy, iy + ih))
   const dx = cx - nx
   const dy = cy - ny
   return dx * dx + dy * dy <= cr * cr
 }
 /** 面板矩形与角色圆碰撞时的法线（圆中心 → 面板最近点方向 = 面板推开方向）；null=不碰。 */
 function panelRoleNormal(px: number, py: number, pW: number, pH: number, cx: number, cy: number, cr: number): { x: number; y: number; depth: number } | null {
-  const qx = Math.max(px, Math.min(cx, px + pW))
-  const qy = Math.max(py, Math.min(cy, py + pH))
+  // 面板圆角核矩形（四角内缩圆角半径）作为碰撞箱，角色圆碰内核才算碰撞
+  const ix = px + INFO_RADIUS
+  const iy = py + INFO_RADIUS
+  const iw = pW - 2 * INFO_RADIUS
+  const ih = pH - 2 * INFO_RADIUS
+  const qx = Math.max(ix, Math.min(cx, ix + iw))
+  const qy = Math.max(iy, Math.min(cy, iy + ih))
   let nx = qx - cx
   let ny = qy - cy
   const d2 = nx * nx + ny * ny
   if (d2 > cr * cr) return null
   if (d2 === 0) {
-    nx = cx < px + pW / 2 ? -1 : 1
-    ny = cy < py + pH / 2 ? -1 : 1
+    nx = cx < ix + iw / 2 ? -1 : 1
+    ny = cy < iy + ih / 2 ? -1 : 1
   }
   const d = Math.hypot(nx, ny) || 1
   return { x: nx / d, y: ny / d, depth: cr - d }
