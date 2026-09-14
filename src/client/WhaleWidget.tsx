@@ -130,13 +130,14 @@ export function WhaleWidget() {
   })
   // 信息面板：独立窗口（默认跟随角色；距离超阈值或直接拖拽则脱离）
   const [infoPos] = useState<{ x: number; y: number }>(() => {
+    const ws = loadLocalConfig().widgetScale
     const rw = window.innerWidth
     const rh = window.innerHeight
-    const rx = rw - WIDGET_W - 8
-    const ry = rh - WIDGET_H - 8
+    const rx = rw - WIDGET_W * ws - 8
+    const ry = rh - WIDGET_H * ws - 8
     return {
-      x: Math.max(8, Math.min(rw - INFO_W - 8, rx + WIDGET_W / 2 - INFO_W / 2)),
-      y: Math.max(8, Math.min(rh - INFO_H - 8, ry + WIDGET_H + 12))
+      x: Math.max(8, Math.min(rw - INFO_W - 8, rx + (WIDGET_W * ws) / 2 - INFO_W / 2)),
+      y: Math.max(8, Math.min(rh - INFO_H - 8, ry + WIDGET_H * ws + 12))
     }
   })
   const [pressed, setPressed] = useState(false)
@@ -176,6 +177,26 @@ export function WhaleWidget() {
   const freeStartRef = useRef(0)
   const lastRolePosRef = useRef({ x: 0, y: 0 })
   const infoDragRef = useRef<{ dx: number; dy: number } | null>(null)
+  // 角色下方的"默认悬浮位"（按缩放后的视觉尺寸计算）
+  const defaultInfoPos = useCallback((ws: number) => {
+    const rw = window.innerWidth
+    const rh = window.innerHeight
+    const roleW = WIDGET_W * ws
+    const roleH = WIDGET_H * ws
+    const ps = config.linkScale ? config.widgetScale : config.infoScale
+    const rx = rw - roleW - 8
+    const ry = rh - roleH - 8
+    return {
+      x: Math.max(8, Math.min(rw - INFO_W * ps - 8, rx + roleW / 2 - (INFO_W * ps) / 2)),
+      y: Math.max(8, Math.min(rh - INFO_H * ps - 8, ry + roleH + 12))
+    }
+  }, [config.infoScale, config.linkScale, config.widgetScale])
+  // 大小变化时把面板送回默认悬浮位（用户拖出去的 free 面板同样归位，保证"默认位置"始终随尺寸刷新）
+  useEffect(() => {
+    infoPosRef.current = defaultInfoPos(config.widgetScale)
+    infoVelRef.current = { x: 0, y: 0 }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.widgetScale, config.infoScale, config.linkScale])
   const infoMoveLastRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const flingRef = useRef<{ cancel: () => void } | null>(null)
   const bounceTimerRef = useRef(0)
@@ -383,17 +404,24 @@ export function WhaleWidget() {
       const dt = Math.max(0.001, Math.min(0.05, (now - last) / 1000))
       last = now
       const p = posRef.current
+      // 缩放感知：角色/面板的视觉尺寸随 widgetScale/infoScale（linkScale 时面板随挂件）
+      const ws = config.widgetScale
+      const ps = config.linkScale ? config.widgetScale : config.infoScale
+      const infoW = INFO_W * ps
+      const infoH = INFO_H * ps
+      const roleW = WIDGET_W * ws
+      const roleH0 = WIDGET_H * ws
       // 锚点=角色下方；角色太靠边时 clamp 进视口，避免信息面板跑出屏幕
       const vw = window.innerWidth
       const vh = window.innerHeight
-      const cX = (v: number) => Math.max(8, Math.min(vw - INFO_W - 8, v))
-      const cY = (v: number) => Math.max(8, Math.min(vh - INFO_H - 8, v))
-      const anchor = { x: cX(p.x + WIDGET_W / 2 - INFO_W / 2), y: cY(p.y + WIDGET_H + 12) }
+      const cX = (v: number) => Math.max(8, Math.min(vw - infoW - 8, v))
+      const cY = (v: number) => Math.max(8, Math.min(vh - infoH - 8, v))
+      const anchor = { x: cX(p.x + roleW / 2 - infoW / 2), y: cY(p.y + roleH0 + 12) }
       // 角色圆形碰撞箱（视觉区域，避免矩形含下方空白）
-      const roleH = WIDGET_H * 0.78
-      const roleCx = p.x + WIDGET_W / 2
+      const roleH = roleH0 * 0.78
+      const roleCx = p.x + roleW / 2
       const roleCy = p.y + roleH / 2
-      const roleR = Math.max(22, Math.min(WIDGET_W, roleH) / 2 * 0.9)
+      const roleR = Math.max(22 * ws, Math.min(roleW, roleH) / 2 * 0.9)
       if (infoModeRef.current === 'follow') {
         const k = 0.12
         const nx = infoPosRef.current.x + (anchor.x - infoPosRef.current.x) * k
@@ -419,11 +447,11 @@ export function WhaleWidget() {
           const vw = window.innerWidth
           const vh = window.innerHeight
           if (infoPosRef.current.x < 8) { infoPosRef.current.x = 8; infoVelRef.current.x = Math.abs(infoVelRef.current.x) * 0.8 }
-          if (infoPosRef.current.x > vw - INFO_W - 8) { infoPosRef.current.x = vw - INFO_W - 8; infoVelRef.current.x = -Math.abs(infoVelRef.current.x) * 0.8 }
+          if (infoPosRef.current.x > vw - infoW - 8) { infoPosRef.current.x = vw - infoW - 8; infoVelRef.current.x = -Math.abs(infoVelRef.current.x) * 0.8 }
           if (infoPosRef.current.y < 8) { infoPosRef.current.y = 8; infoVelRef.current.y = Math.abs(infoVelRef.current.y) * 0.8 }
-          if (infoPosRef.current.y > vh - INFO_H - 8) { infoPosRef.current.y = vh - INFO_H - 8; infoVelRef.current.y = -Math.abs(infoVelRef.current.y) * 0.8 }
+          if (infoPosRef.current.y > vh - infoH - 8) { infoPosRef.current.y = vh - infoH - 8; infoVelRef.current.y = -Math.abs(infoVelRef.current.y) * 0.8 }
           // 与角色（圆）碰撞：沿法线推离**穿透深度**（平滑、不瞬移到固定位置）并反射速度
-          const n = panelRoleNormal(infoPosRef.current.x, infoPosRef.current.y, INFO_W, INFO_H, roleCx, roleCy, roleR)
+          const n = panelRoleNormal(infoPosRef.current.x, infoPosRef.current.y, infoW, infoH, roleCx, roleCy, roleR)
           if (n) {
             infoPosRef.current.x = cX(infoPosRef.current.x + n.x * (n.depth + 2))
             infoPosRef.current.y = cY(infoPosRef.current.y + n.y * (n.depth + 2))
@@ -447,8 +475,8 @@ export function WhaleWidget() {
                   y: p.y,
                   vx: pvx * 0.7,
                   vy: pvy * 0.7,
-                  width: WIDGET_W,
-                  height: WIDGET_H,
+                  width: WIDGET_W * ws,
+                  height: WIDGET_H * ws,
                   getObstacle,
                   onObstacleHit: handleObstacleHit,
                   onMove: (x, y) => setPos({ x, y }),
@@ -493,7 +521,7 @@ export function WhaleWidget() {
       if (iel) {
         iel.style.transform = `translate3d(${infoPosRef.current.x}px,${infoPosRef.current.y}px,0) scale(${config.linkScale ? config.widgetScale : config.infoScale})`
       }
-      __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: INFO_W, h: INFO_H }
+      __wgInfoGlobal = { x: infoPosRef.current.x, y: infoPosRef.current.y, w: infoW, h: infoH }
       // 减负：改为低频调度（约 20fps），面板跟随/碰撞足够平滑，显著降 CPU
     }
     // 位置用 rAF 高频顺滑更新（直接写 DOM 轻量），避免降频导致"一帧一帧走"
@@ -582,8 +610,8 @@ export function WhaleWidget() {
               y: posRef.current.y,
               vx: pvx * 0.7,
               vy: pvy * 0.7,
-              width: WIDGET_W,
-              height: WIDGET_H,
+              width: WIDGET_W * config.widgetScale,
+              height: WIDGET_H * config.widgetScale,
               getObstacle,
               onObstacleHit: handleObstacleHit,
               onMove: (x, y) => setPos({ x, y }),
@@ -869,8 +897,8 @@ export function WhaleWidget() {
               y: rect.top,
               vx,
               vy,
-              width: WIDGET_W,
-              height: WIDGET_H,
+              width: WIDGET_W * config.widgetScale,
+              height: WIDGET_H * config.widgetScale,
               getObstacle,
               onObstacleHit: handleObstacleHit,
               onMove: (x, y) => setPos({ x, y }),
@@ -980,7 +1008,7 @@ export function WhaleWidget() {
   // 窗口变化：把挂件 clamp 回窗口内，并依据相对位移给动量，让它在窗口内反弹
   useEffect(() => {
     posRef.current = pos
-  }, [pos])
+  }, [pos, config.widgetScale])
   useEffect(() => {
     const onResize = () => {
       const nw = window.innerWidth
