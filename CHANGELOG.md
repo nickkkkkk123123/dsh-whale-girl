@@ -1,5 +1,12 @@
 # 更新日志
 
+## [0.3.10] - 2026-09-14
+
+### 功能（infoScale 悬案告破后回归）
+- **信息面板独立大小**（`infoScale` 滑块 60%~150%）+ **锁定角色与面板大小同步**（`linkScale`）正式回归。
+- ⚠️ **v0.3.7 崩溃根因查明**：当时把 `config.widgetScale` 写进了 `pos` 的 `useState` 初始化器，而 `config` 在其 28 行之后才声明——TDZ `ReferenceError` 首帧炸掉整棵 React 树（鲸鱼娘不显示）。transform scale 本身无罪。本次修复：`config` 声明移到 `pos` 之前。
+- tsc --noEmit 干净，vitest 16/16 通过。
+
 ## [0.3.9] - 2026-09-14
 
 ### 功能

@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260914T015321941Z-9132-39fcd16e0bf7",
+  "runId": "20260914T015321941Z-9132-39fcd16e0bf7",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "30174305bdafa3d81c581d19ad6f7f688836ff8f",
+  "diffHash": "9e4d55a4920579d73a4f3dd663fd0418b19bbfa2810d1396303693078ec29224",
+  "rulesVersion": "unavailable",
+  "sessionHash": "7abc4214174567a44bbb185b88674520c2efe8b81664a294fefa70fc56b1dc23",
+  "reportRef": ".mimosa/reports/task-review-sess_561b782d-b672-4dfb-9c28-eec7121e0934-20260914T015321941Z-9132-39fcd16e0bf7.json",
+  "events": [
+    {
+      "eventId": "hook-83f355c4f0ffc254507a6492dd0a6688",
+      "findingId": "mimosa-071a29c3f6e00d3711dafcea",
+      "type": "finding_observed",
+      "at": "2026-09-14T01:50:19.401Z",
+      "identity": {
+        "projectRelativeFile": "src/client/quotes.ts",
+        "ruleId": "security",
+        "codeEvidenceHash": "dc6bbfaf84f4a948add050ba4435f7996dac9516ea0441e02241c7bfe8d5b797",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 42,
+      "endLine": 42,
+      "reasonCode": "advisory",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "dc6bbfaf84f4a948add050ba4435f7996dac9516ea0441e02241c7bfe8d5b797"
+      },
+      "sequence": 0
+    },
+    {
+      "eventId": "hook-99801a3115ad8206dd20ac472b5800e5",
+      "findingId": "mimosa-f04aed3ba6f954dd186d7b0f",
+      "type": "finding_observed",
+      "at": "2026-09-14T01:50:19.401Z",
+      "identity": {
+        "projectRelativeFile": "src/client/quotes.ts",
+        "ruleId": "security",
+        "codeEvidenceHash": "22b470266f95cd5d424d531d4a0a2b560f92b72f04fa695556149d0cd0c9d15a",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 47,
+      "endLine": 47,
+      "reasonCode": "advisory",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "22b470266f95cd5d424d531d4a0a2b560f92b72f04fa695556149d0cd0c9d15a"
+      },
+      "sequence": 1
+    },
+    {
+      "eventId": "hook-267ec85e1f29a49f00a5612e8173dded",
+      "findingId": "mimosa-f04aed3ba6f954dd186d7b0f",
+      "type": "finding_observed",
+      "at": "2026-09-14T01:53:21.941Z",
+      "identity": {
+        "projectRelativeFile": "src/client/quotes.ts",
+        "ruleId": "security",
+        "codeEvidenceHash": "22b470266f95cd5d424d531d4a0a2b560f92b72f04fa695556149d0cd0c9d15a",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 47,
+      "endLine": 47,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "22b470266f95cd5d424d531d4a0a2b560f92b72f04fa695556149d0cd0c9d15a"
+      },
+      "sequence": 2
+    },
+    {
+      "eventId": "hook-12ce83f6de664d740d65dc5050640403",
+      "findingId": "mimosa-58302c4876412cf95ac72b87",
+      "type": "finding_observed",
+      "at": "2026-09-14T01:53:21.941Z",
+      "identity": {
+        "projectRelativeFile": "lib/client.js",
+        "ruleId": "security",
+        "codeEvidenceHash": "133cd02b5f2c9f576b4a3b8b748146b3710b1013d478d083f1b05427356b20d4",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 692,
+      "endLine": 692,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "133cd02b5f2c9f576b4a3b8b748146b3710b1013d478d083f1b05427356b20d4"
+      },
+      "sequence": 3
+    }
+  ],
+  "observedFindingIds": [
+    "mimosa-071a29c3f6e00d3711dafcea",
+    "mimosa-f04aed3ba6f954dd186d7b0f",
+    "mimosa-3a5ce45de7b90a92f0e0cfd1",
+    "mimosa-58302c4876412cf95ac72b87",
+    "mimosa-33c5d69ed8f3b1086cda5af0"
+  ],
+  "verifiedFiles": [
+    {
+      "file": "src/client/quotes.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "lib/client.js",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-14T01:53:22.334Z"
+}

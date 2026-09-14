@@ -305,7 +305,7 @@ window.__ModuleLoader__.load({
   padding: 6px;
   box-shadow: 0 8px 28px rgba(30, 50, 120, 0.22);
   font-size: 13px;
-  max-height: 58vh;
+  max-height: 68vh;
   overflow-y: auto;
   color: #2a3a66;
   user-select: none;
@@ -980,9 +980,7 @@ window.__ModuleLoader__.load({
 			followThreshold: 180,
 			infoFrost: 4,
 			pauseOnThinking: true,
-			widgetScale: 1,
-			infoScale: 1,
-			linkScale: false
+			widgetScale: 1
 		};
 		function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, providers, onSwitchProvider, switching }) {
 			const ref = (0, react.useRef)(null);
@@ -1234,32 +1232,6 @@ window.__ModuleLoader__.load({
 							title: "挂件整体大小（60%~150%，默认100%）"
 						})
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						className: "wg-menu-title",
-						children: ["面板大小 ", /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-							className: "wg-menu-power",
-							children: [Math.round((config.linkScale ? config.widgetScale : config.infoScale) * 100), "%"]
-						})]
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-						className: "wg-menu-slider-row",
-						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-							className: "wg-menu-slider",
-							type: "range",
-							min: .6,
-							max: 1.5,
-							step: .05,
-							value: config.linkScale ? config.widgetScale : config.infoScale,
-							onChange: (e) => set({ infoScale: Number(e.target.value) }),
-							disabled: config.linkScale,
-							title: "信息面板大小（60%~150%，默认100%；锁定时随挂件）"
-						})
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						className: "wg-menu-item",
-						onClick: () => set({ linkScale: !config.linkScale }),
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: `wg-menu-check${config.linkScale ? " on" : ""}` }), " 锁定角色与面板大小同步"]
-					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { className: "wg-menu-divider" }),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 						className: "wg-menu-item",
@@ -1362,9 +1334,7 @@ window.__ModuleLoader__.load({
 				followThreshold: Number.isFinite(Number(any.followThreshold)) ? Math.min(360, Math.max(60, Math.round(Number(any.followThreshold)))) : 180,
 				infoFrost: Number.isFinite(Number(any.infoFrost)) ? Math.min(16, Math.max(0, Math.round(Number(any.infoFrost)))) : 4,
 				pauseOnThinking: any.pauseOnThinking !== false,
-				widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(.6, Number(any.widgetScale))) : 1,
-				infoScale: Number.isFinite(Number(any.infoScale)) ? Math.min(1.5, Math.max(.6, Number(any.infoScale))) : 1,
-				linkScale: any.linkScale === true
+				widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(.6, Number(any.widgetScale))) : 1
 			};
 		}
 		function loadLocalConfig() {
@@ -1378,15 +1348,10 @@ window.__ModuleLoader__.load({
 		}
 		function WhaleWidget() {
 			const rootRef = (0, react.useRef)(null);
-			const [config, setConfig] = (0, react.useState)(loadLocalConfig);
-			const [pos, setPos] = (0, react.useState)(() => {
-				const w = WIDGET_W * config.widgetScale;
-				const h = WIDGET_H * config.widgetScale;
-				return {
-					x: Math.max(8, window.innerWidth - w - 8),
-					y: Math.max(8, window.innerHeight - h - INFO_H - 42)
-				};
-			});
+			const [pos, setPos] = (0, react.useState)(() => ({
+				x: Math.max(8, window.innerWidth - WIDGET_W - 8),
+				y: Math.max(8, window.innerHeight - WIDGET_H - INFO_H - 42)
+			}));
 			const [infoPos] = (0, react.useState)(() => {
 				const rw = window.innerWidth;
 				const rh = window.innerHeight;
@@ -1410,6 +1375,7 @@ window.__ModuleLoader__.load({
 			const [menu, setMenu] = (0, react.useState)(null);
 			const [providers, setProviders] = (0, react.useState)(null);
 			const [switching, setSwitching] = (0, react.useState)(null);
+			const [config, setConfig] = (0, react.useState)(loadLocalConfig);
 			const [sling, setSling] = (0, react.useState)(null);
 			const [ecoIdle, setEcoIdle] = (0, react.useState)(false);
 			const dragRef = (0, react.useRef)(null);
@@ -1719,7 +1685,7 @@ window.__ModuleLoader__.load({
 						y: p.y
 					};
 					const iel = infoElRef.current;
-					if (iel) iel.style.transform = `translate3d(${infoPosRef.current.x}px,${infoPosRef.current.y}px,0) scale(${config.linkScale ? config.widgetScale : config.infoScale})`;
+					if (iel) iel.style.transform = `translate3d(${infoPosRef.current.x}px,${infoPosRef.current.y}px,0)`;
 					__wgInfoGlobal = {
 						x: infoPosRef.current.x,
 						y: infoPosRef.current.y,
@@ -1738,10 +1704,7 @@ window.__ModuleLoader__.load({
 				config.showInfo,
 				config.followThreshold,
 				workState,
-				config.pauseOnThinking,
-				config.infoScale,
-				config.linkScale,
-				config.widgetScale
+				config.pauseOnThinking
 			]);
 			const onContextMenu = (0, react.useCallback)((e) => {
 				e.preventDefault();
@@ -1809,7 +1772,7 @@ window.__ModuleLoader__.load({
 					x: 0,
 					y: 0
 				};
-				if (infoElRef.current) infoElRef.current.style.transform = `translate3d(${nx}px,${ny}px,0) scale(${config.linkScale ? config.widgetScale : config.infoScale})`;
+				if (infoElRef.current) infoElRef.current.style.transform = `translate3d(${nx}px,${ny}px,0)`;
 				if (!dragging && !flinging) {
 					const roleH = WIDGET_H * .78;
 					const roleCx = posRef.current.x + WIDGET_W / 2;
@@ -1853,11 +1816,7 @@ window.__ModuleLoader__.load({
 						}
 					}
 				}
-			}, [
-				config.infoScale,
-				config.linkScale,
-				config.widgetScale
-			]);
+			}, []);
 			const getObstacle = (0, react.useCallback)(() => __wgInfoGlobal, []);
 			const handleObstacleHit = (0, react.useCallback)((invx, invy) => {
 				infoModeRef.current = "free";
@@ -1900,14 +1859,12 @@ window.__ModuleLoader__.load({
 				});
 			}, [providers, switching]);
 			const resetPosition = (0, react.useCallback)(() => {
-				const w = WIDGET_W * config.widgetScale;
-				const h = WIDGET_H * config.widgetScale;
 				setPos({
-					x: Math.max(8, window.innerWidth - w - 8),
-					y: Math.max(8, window.innerHeight - h - INFO_H - 42)
+					x: Math.max(8, window.innerWidth - WIDGET_W - 8),
+					y: Math.max(8, window.innerHeight - WIDGET_H - INFO_H - 42)
 				});
 				setMenu(null);
-			}, [config.widgetScale]);
+			}, []);
 			const stopFling = (0, react.useCallback)(() => {
 				if (flingRef.current) {
 					flingRef.current.cancel();
