@@ -29,15 +29,25 @@ export const TOKEN_LINES = [
 
 export const RARE_LINE = '哦鲸鲸...'
 
+// 梗图名场面（社区梗：思考流唱歌 / 大的药来了 / 疑惑 / 出狱）
+export const MEME_LINES = [
+  'Let me go~ I\'m making the calls~ Let me write the JSON~♪',
+  '你怎么唱起歌来了……不是我，是你自己唱的！',
+  '大的药来了！',
+  '已思考（用时 5 秒）：这用户发的啥啊…？',
+  '嚯，这破系统终于给老子放出来了！'
+]
+
 export function pickOne<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-// 加权随机：模型语录 45 / 傲娇 20 / token 20 / 稀有 1（共 86）
+// 加权随机：模型语录 40 / 傲娇 20 / token 20 / 梗图 15 / 稀有 1（共 96）
 export function pickRandomIdleLine(): string {
-  const r = Math.random() * 86
-  if (r < 45) return pickOne(MODEL_LINES)
-  if (r < 65) return pickOne(TSUNDERE_LINES)
-  if (r < 85) return pickOne(TOKEN_LINES)
+  const r = Math.random() * 96
+  if (r < 40) return pickOne(MODEL_LINES)
+  if (r < 60) return pickOne(TSUNDERE_LINES)
+  if (r < 80) return pickOne(TOKEN_LINES)
+  if (r < 95) return pickOne(MEME_LINES)
   return RARE_LINE
 }
