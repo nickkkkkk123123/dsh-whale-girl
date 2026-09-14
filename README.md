@@ -29,6 +29,8 @@ dsh plugin add nickkkkkk123123/dsh-whale-girl
 # 或本地源码目录 link 依赖后加入 profile bundles
 ```
 
+> 卸载说明：卸载后 DSH_HOME（`~/.dsh`）会留下三个数据文件（`.whale-girl-config.json` / `.whale-girl-usage.json` / `.whale-girl-diag.log`，及轮转产生的 `.whale-girl-diag.log.old`），均为纯数据、不参与任何执行，不需要可手动删除。
+
 ## 配置
 
 挂件配置保存在 `~/.dsh/.whale-girl-config.json`（可用右键菜单可视化修改，也可直接编辑文件）：

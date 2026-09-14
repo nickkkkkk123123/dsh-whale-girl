@@ -21,6 +21,8 @@ const ASSET_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 /** 诊断记录（排查 client 数据是否到达、host 数据是否就绪）。用完可删除该日志文件。 */
 function diag(line: string): void {
   try {
+    // 轮转：超过 1MB 归档为 .old，避免长期使用无限增长
+    if (fs.statSync(DIAG_FILE).size > 1024 * 1024) fs.renameSync(DIAG_FILE, DIAG_FILE + '.old')
     fs.appendFileSync(DIAG_FILE, `[${new Date().toISOString()}] ${line}\n`)
   } catch {
     // ignore
