@@ -242,6 +242,8 @@ export function WhaleWidget() {
   const ropeLenRef = useRef(90)
   // 绳摆延迟激活：位移超过阈值才激活（纯点击=摸头，不触发绳子下坠）
   const ropePendingRef = useRef(false)
+  // 按下瞬间的动量快照：缓冲期内 roleVelRef 会被跟手逻辑污染，激活时用快照继承
+  const grabVelRef = useRef({ x: 0, y: 0 })
   // 角色实时速度（由甩抛 onMove / 面板物理循环回写），运动中抓取时继承动量
   const roleVelRef = useRef({ x: 0, y: 0 })
   // 0.4 旋转表现：角色朝向用欠阻尼弹簧追赶目标角度（滞后+过冲=摆动更真实）
@@ -983,6 +985,8 @@ export function WhaleWidget() {
       const el = rootRef.current
       if (!el) return
       markActive()
+      // 按下瞬间给当前动量拍快照（此时若在甩抛中，roleVelRef 还是飞行速度；缓冲期会被跟手逻辑覆盖）
+      grabVelRef.current = { ...roleVelRef.current }
       stopFling()
       const rect = el.getBoundingClientRect()
       // 中键：弹弓模式（记录原位置，画连接线；松开时沿原位置→当前位置方向抛掷）
@@ -1053,8 +1057,8 @@ export function WhaleWidget() {
     // 0.4 绳摆延迟激活：位移超过 6px 才挂绳（点击≠抓取）
     if (ropePendingRef.current && pressStartRef.current && Math.hypot(e.clientX - pressStartRef.current.x, e.clientY - pressStartRef.current.y) > 6) {
       ropePendingRef.current = false
-      // 运动中抓取：继承角色当前动量（甩飞中途抓住会顺势荡起来，不再瞬间停死）
-      ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: roleVelRef.current.x, vy: roleVelRef.current.y }
+      // 运动中抓取：继承按下瞬间的动量快照（甩飞中途抓住会顺势荡起来，不再瞬间停死）
+      ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: grabVelRef.current.x, vy: grabVelRef.current.y }
       ropeLenRef.current = 90 * (config.widgetScale || 1)
       startRopeSim()
     }
