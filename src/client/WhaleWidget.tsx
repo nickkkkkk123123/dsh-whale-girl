@@ -210,6 +210,9 @@ export function WhaleWidget() {
   const ropeLenRef = useRef(90)
   // 角色实时速度（由甩抛 onMove / 面板物理循环回写），运动中抓取时继承动量
   const roleVelRef = useRef({ x: 0, y: 0 })
+  // 0.4 旋转表现：角色朝向用欠阻尼弹簧追赶目标角度（滞后+过冲=摆动更真实）
+  const swingTargetRef = useRef(0)
+  const swingRotRef = useRef({ a: 0, v: 0 })
   const infoPosRef = useRef(infoPos)
   const infoElRef = useRef<HTMLDivElement>(null)
   const infoModeRef = useRef<'follow' | 'free' | 'returning'>('follow')
@@ -468,6 +471,14 @@ export function WhaleWidget() {
       const rvm = Math.hypot(rvx, rvy)
       if (rvm > 3000) { rvx = (rvx / rvm) * 3000; rvy = (rvy / rvm) * 3000 }
       roleVelRef.current = { x: rvx, y: rvy }
+      // 旋转弹簧：欠阻尼追赶目标角度（绳摆角/飞行倾斜），松开后目标缓慢回正
+      if (!ropeRef.current && !flinging) swingTargetRef.current *= Math.pow(0.4, dt)
+      const s = swingRotRef.current
+      const sAcc = (swingTargetRef.current - s.a) * 60 - s.v * 9
+      s.v += sAcc * dt
+      s.a += s.v * dt
+      const swingImg = rootRef.current?.querySelector('.wg-img') as HTMLElement | null
+      if (swingImg) swingImg.style.transform = `rotate(${s.a.toFixed(2)}deg)`
       if (infoModeRef.current === 'follow') {
         const k = 0.12
         const nx = infoPosRef.current.x + (anchor.x - infoPosRef.current.x) * k
@@ -531,7 +542,7 @@ export function WhaleWidget() {
                   bounceE: config.bounceE,
                   getObstacle,
                   onObstacleHit: handleObstacleHit,
-                  onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+                  onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
                   onBounce: (axis) => {
                     bounced = true
                     soundRef.current?.bounce()
@@ -669,7 +680,7 @@ export function WhaleWidget() {
               bounceE: config.bounceE,
               getObstacle,
               onObstacleHit: handleObstacleHit,
-              onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+              onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
               onBounce: (axis) => {
                 bounced = true
                 soundRef.current?.bounce()
@@ -771,9 +782,6 @@ export function WhaleWidget() {
     }
     ropeRef.current = null
     hideRope()
-    // 归零绳摆旋转表现
-    const swingImg = rootRef.current?.querySelector('.wg-img') as HTMLElement | null
-    if (swingImg) swingImg.style.transform = ''
   }, [])
   const startRopeSim = useCallback(() => {
     if (ropeRafRef.current) return
@@ -824,12 +832,9 @@ export function WhaleWidget() {
         }
       }
       drawRope(rope.ax, rope.ay, cx, cy)
-      // 绳摆甩动的旋转表现：角色随绳角度倾斜（竖直下垂为 0°，随甩动摆到 ±40°）
-      const swingImg = rootRef.current?.querySelector('.wg-img') as HTMLElement | null
-      if (swingImg) {
-        const ang = Math.atan2(cx - rope.ax, cy - rope.ay) * (180 / Math.PI)
-        swingImg.style.transform = `rotate(${Math.max(-40, Math.min(40, ang))}deg)`
-      }
+      // 绳摆甩动的旋转目标 = 绳偏离竖直方向的角度（角色朝向由弹簧追赶，不瞬贴）
+      const ropeDeg = Math.atan2(cx - rope.ax, cy - rope.ay) * (180 / Math.PI)
+      swingTargetRef.current = Math.max(-40, Math.min(40, ropeDeg))
       // 视口 clamp（按中心）
       cx = Math.max(WIDGET_W / 2, Math.min(window.innerWidth - WIDGET_W / 2, cx))
       cy = Math.max(WIDGET_H / 2, Math.min(window.innerHeight - WIDGET_H / 2, cy))
@@ -1049,7 +1054,7 @@ export function WhaleWidget() {
               bounceE: config.bounceE,
               getObstacle,
               onObstacleHit: handleObstacleHit,
-              onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+              onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
               onBounce: (axis) => {
                 bounced = true
                 reportEvent('bounce', { axis })
@@ -1117,7 +1122,7 @@ export function WhaleWidget() {
             gravity: config.gravityMode ? 2400 : undefined,
             getObstacle,
             onObstacleHit: handleObstacleHit,
-            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
             onBounce: (axis) => {
               bounced = true
               reportEvent('bounce', { axis })
@@ -1160,7 +1165,7 @@ export function WhaleWidget() {
             groundFriction: config.groundFriction,
             getObstacle,
             onObstacleHit: handleObstacleHit,
-            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
             onBounce: (axis) => {
               bounced = true
               reportEvent('sound', { kind: 'bounce' })
@@ -1197,7 +1202,7 @@ export function WhaleWidget() {
             groundFriction: config.groundFriction,
             getObstacle,
             onObstacleHit: handleObstacleHit,
-            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
             onBounce: (axis) => {
               reportEvent('sound', { kind: 'bounce' })
               soundRef.current?.bounce()
@@ -1249,7 +1254,7 @@ export function WhaleWidget() {
           bounceE: config.bounceE,
           getObstacle,
           onObstacleHit: handleObstacleHit,
-          onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+          onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
           onBounce: (axis) => {
             bounced = true
             reportEvent('bounce', { axis })
