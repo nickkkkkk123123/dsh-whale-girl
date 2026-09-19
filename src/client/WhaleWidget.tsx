@@ -33,24 +33,56 @@ const SLING_HINT = '悄悄告诉你：按住中键拖拽再松手，我会像弹
 const WIDGET_W = 170
 
 // 0.4 弹性绳可视化：全屏覆盖层（直写 DOM，不触发 React 渲染）
-let ropeOverlay: { svg: SVGSVGElement; line: SVGLineElement } | null = null
-function drawRope(x1: number, y1: number, x2: number, y2: number) {
+let ropeOverlay: { svg: SVGSVGElement; path: SVGPathElement; ring: SVGCircleElement } | null = null
+function drawRope(x1: number, y1: number, x2: number, y2: number, ropeLen: number, ropeMax: number) {
   if (!ropeOverlay) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
     svg.style.cssText = "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2147483646"
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line")
-    line.setAttribute("stroke", "rgba(90,150,255,0.9)")
-    line.setAttribute("stroke-width", "3")
-    line.setAttribute("stroke-linecap", "round")
-    svg.appendChild(line)
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
+    path.setAttribute("stroke", "rgba(90,150,255,0.9)")
+    path.setAttribute("stroke-width", "3.5")
+    path.setAttribute("stroke-linecap", "round")
+    path.setAttribute("fill", "none")
+    svg.appendChild(path)
+    const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle")
+    ring.setAttribute("r", "4.5")
+    ring.setAttribute("fill", "none")
+    ring.setAttribute("stroke", "rgba(160,200,255,0.9)")
+    ring.setAttribute("stroke-width", "2")
+    svg.appendChild(ring)
     document.body.appendChild(svg)
-    ropeOverlay = { svg, line }
+    ropeOverlay = { svg, path, ring }
   }
   ropeOverlay.svg.style.display = "block"
-  ropeOverlay.line.setAttribute("x1", String(x1))
-  ropeOverlay.line.setAttribute("y1", String(y1))
-  ropeOverlay.line.setAttribute("x2", String(x2))
-  ropeOverlay.line.setAttribute("y2", String(y2))
+  // 张力 = 实际距离超出自然绳长的程度（0=松弛，1=到达弹性上限）
+  const dist = Math.hypot(x2 - x1, y2 - y1)
+  const t = Math.max(0, Math.min(1, (dist - ropeLen) / Math.max(1, ropeMax)))
+  // 颜色：水蓝 → 绷紧橙红；粗细：松弛 3.5 → 绷紧 2
+  const lerp = (a: number, b: number) => Math.round(a + (b - a) * t)
+  const col = `rgba(${lerp(90, 255)},${lerp(150, 130)},${lerp(255, 80)},${(0.75 + 0.2 * t).toFixed(2)})`
+  const wdt = (3.5 - 1.5 * t).toFixed(2)
+  // 绷紧超过 70% 时轻微震颤（正弦扰动，幅度随张力）
+  const now = performance.now()
+  const tremor = t > 0.7 ? Math.sin(now / 1000 * 40) * 1.2 * t : 0
+  const path = ropeOverlay.path
+  if (dist >= ropeLen - 0.5 || t > 0) {
+    // 绷紧：直线（带震颤）
+    const mx = (x1 + x2) / 2 + tremor
+    const my = (y1 + y2) / 2 + tremor
+    path.setAttribute("d", `M ${x1} ${y1} L ${mx} ${my} L ${x2} ${y2}`)
+  } else {
+    // 松弛：二次贝塞尔下垂（下垂量与松驰程度成正比，重力方向）
+    const sag = Math.min(90, (ropeLen - dist) * 0.6)
+    const mx = (x1 + x2) / 2
+    const my = (y1 + y2) / 2 + sag
+    path.setAttribute("d", `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`)
+  }
+  path.setAttribute("stroke", col)
+  path.setAttribute("stroke-width", wdt)
+  // 锚点抓取环
+  ropeOverlay.ring.setAttribute("cx", String(x1))
+  ropeOverlay.ring.setAttribute("cy", String(y1))
+  ropeOverlay.ring.setAttribute("r", String(4.5 + t * 1.5))
 }
 function hideRope() {
   if (ropeOverlay) ropeOverlay.svg.style.display = "none"
@@ -831,7 +863,7 @@ export function WhaleWidget() {
           rope.vy -= vRad * ny2
         }
       }
-      drawRope(rope.ax, rope.ay, cx, cy)
+      drawRope(rope.ax, rope.ay, cx, cy, ropeLenRef.current, config.ropeMax)
       // 绳摆甩动的旋转目标 = 绳偏离竖直方向的角度（角色朝向由弹簧追赶，不瞬贴）
       const ropeDeg = Math.atan2(cx - rope.ax, cy - rope.ay) * (180 / Math.PI)
       swingTargetRef.current = Math.max(-40, Math.min(40, ropeDeg))
