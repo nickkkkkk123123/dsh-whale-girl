@@ -141,24 +141,26 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
     }
 
     const b = bounds()
+    // 边缘反弹：仅当入射速度足够大（>120px/s）才翻转速度并触发反弹事件，
+    // 低速贴边时直接归零速度停在边上——修复贴边时反复触发反弹（音效/特效刷屏）的 bug
     if (x <= b.left) {
       x = b.left
-      vx = Math.abs(vx)
-      opts.onBounce?.('x')
+      if (vx < -120) { vx = -vx; opts.onBounce?.('x') } else if (vx < 0) vx = 0
     } else if (x >= b.right) {
       x = b.right
-      vx = -Math.abs(vx)
-      opts.onBounce?.('x')
+      if (vx > 120) { vx = -vx; opts.onBounce?.('x') } else if (vx > 0) vx = 0
     }
     if (y <= b.top) {
       y = b.top
-      vy = Math.abs(vy)
-      opts.onBounce?.('y')
+      if (vy < -120) { vy = -vy; opts.onBounce?.('y') } else if (vy < 0) vy = 0
     } else if (y >= b.bottom) {
       y = b.bottom
-      vy = gravity > 0 ? -Math.abs(vy) * 0.25 : -Math.abs(vy)
-      if (gravity > 0 && Math.abs(vy) < 90) vy = 0
-      opts.onBounce?.('y')
+      if (gravity > 0) {
+        // 软着陆：反弹衰减 0.25，速度过小直接停（不再重复触发）
+        if (vy > 150) { vy = -vy * 0.25; opts.onBounce?.('y') } else vy = 0
+      } else {
+        if (vy > 120) { vy = -vy; opts.onBounce?.('y') } else if (vy > 0) vy = 0
+      }
     }
 
     opts.onMove(x, y)

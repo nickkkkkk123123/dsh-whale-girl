@@ -35,8 +35,16 @@ export interface MenuConfig {
   infoScale: number
   /** 锁定角色与面板大小同步（面板大小=挂件大小） */
   linkScale: boolean
+  /** 绳摆模式：拖拽时角色以弹性绳挂在鼠标上 */
+  ropeMode: boolean
   /** 重力模式：松手落地（关闭=悬浮归位） */
   gravityMode: boolean
+  /** 弹性绳弹簧系数（加速度 = K × 伸长量） */
+  ropeK: number
+  /** 空气阻力系数 0~10（越高收敛越快） */
+  ropeDamp: number
+  /** 弹性上限：绳子最大可伸长量（px），超过后刚性拉住 */
+  ropeMax: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -72,7 +80,11 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   widgetScale: 1,
   infoScale: 1,
   linkScale: false,
-  gravityMode: false
+  gravityMode: false,
+  ropeMode: false,
+  ropeK: 80,
+  ropeDamp: 3,
+  ropeMax: 150
 }
 
 interface Props {
@@ -298,6 +310,57 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ linkScale: !config.linkScale })}>
         <span className={`wg-menu-check${config.linkScale ? ' on' : ''}`} /> 锁定角色与面板大小同步
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ ropeMode: !config.ropeMode })}>
+        <span className={`wg-menu-check${config.ropeMode ? ' on' : ''}`} /> 绳摆拖拽（弹性绳挂鼠标）
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ gravityMode: !config.gravityMode })}>
+        <span className={`wg-menu-check${config.gravityMode ? ' on' : ''}`} /> 重力模式（松手落地）
+      </div>
+      <div className="wg-menu-title">
+        弹性系数 <span className="wg-menu-power">{config.ropeK}</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={20}
+          max={200}
+          step={5}
+          value={config.ropeK}
+          onChange={(e) => set({ ropeK: Number(e.target.value) })}
+          title="弹性绳弹簧系数（20~200，越大越硬）"
+        />
+      </div>
+      <div className="wg-menu-title">
+        阻力系数 <span className="wg-menu-power">{config.ropeDamp}</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={0}
+          max={10}
+          step={1}
+          value={config.ropeDamp}
+          onChange={(e) => set({ ropeDamp: Number(e.target.value) })}
+          title="空气阻力（0~10，越大摆动收敛越快）"
+        />
+      </div>
+      <div className="wg-menu-title">
+        弹性上限 <span className="wg-menu-power">{config.ropeMax}px</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={50}
+          max={300}
+          step={10}
+          value={config.ropeMax}
+          onChange={(e) => set({ ropeMax: Number(e.target.value) })}
+          title="弹性绳最大伸长量（50~300px），超过后刚性拉住"
+        />
       </div>
       <div className="wg-menu-item" onClick={() => set({ gravityMode: !config.gravityMode })}>
         <span className={`wg-menu-check${config.gravityMode ? ' on' : ''}`} /> 重力模式（松手落地）

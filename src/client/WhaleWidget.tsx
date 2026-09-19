@@ -55,8 +55,8 @@ function drawRope(x1: number, y1: number, x2: number, y2: number) {
 function hideRope() {
   if (ropeOverlay) ropeOverlay.svg.style.display = "none"
 }
-/** 弹性绳弹簧系数：加速度 = K × 伸长量（px/s² 每 px）。 */
-const ROPE_K = 80
+/** 弹性绳弹簧系数默认值（可在菜单调整）。 */
+const ROPE_K_DEFAULT = 80
 const WIDGET_H = 180
 /** 松手速度（px/s）超过此值进入甩抛弹跳模式。 */
 const FLING_SPEED = 800
@@ -128,7 +128,11 @@ function normalizeConfig(o: unknown): MenuConfig {
     widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(any.widgetScale))) : 1,
     infoScale: Number.isFinite(Number(any.infoScale)) ? Math.min(1.5, Math.max(0.6, Number(any.infoScale))) : 1,
     linkScale: any.linkScale === true,
-    gravityMode: any.gravityMode === true
+    gravityMode: any.gravityMode === true,
+    ropeMode: any.ropeMode === true,
+    ropeK: Number.isFinite(Number(any.ropeK)) ? Math.min(200, Math.max(20, Number(any.ropeK))) : 80,
+    ropeDamp: Number.isFinite(Number(any.ropeDamp)) ? Math.min(10, Math.max(0, Number(any.ropeDamp))) : 3,
+    ropeMax: Number.isFinite(Number(any.ropeMax)) ? Math.min(400, Math.max(40, Number(any.ropeMax))) : 150
   }
 }
 
@@ -771,8 +775,8 @@ export function WhaleWidget() {
       }
       const dt = Math.min(0.05, (now - ropeLastRef.current) / 1000)
       ropeLastRef.current = now
-      // 重力 + 弹性绳：绳长为自然长度，超出部分产生弹簧拉力（越拉越狠），角色会被"弹"回来
-      rope.vy += (config.gravityMode ? 2400 : 0) * dt
+      // 重力（独立开关）+ 弹性绳（绳长为自然长度，超出部分弹簧拉力，越拉越狠）
+      if (config.gravityMode) rope.vy += 2400 * dt
       const cpx = posRef.current.x + WIDGET_W / 2
       const cpy = posRef.current.y + WIDGET_H / 2
       const dx = cpx - rope.ax
@@ -780,17 +784,33 @@ export function WhaleWidget() {
       const dist = Math.hypot(dx, dy)
       const L = ropeLenRef.current
       if (dist > L && dist > 0.001) {
-        const f = ROPE_K * (dist - L)
+        const f = config.ropeK * (dist - L)
         rope.vx -= (dx / dist) * f * dt
         rope.vy -= (dy / dist) * f * dt
       }
-      // 空气阻尼：让弹性绳的震荡收敛
-      const damp = Math.pow(0.99, dt * 60)
+      // 空气阻尼：阻力系数 0~10 → 每帧衰减（让弹性震荡收敛快慢可调）
+      const damp = Math.pow(1 - config.ropeDamp * 0.008, dt * 60)
       rope.vx *= damp
       rope.vy *= damp
       // 积分（以角色中心为摆锤）
       let cx = cpx + rope.vx * dt
       let cy = cpy + rope.vy * dt
+      // 弹性上限：超过自然绳长 + 可调上限后刚性拉住（绳子拉到头了），并消去向外的径向速度
+      const maxDist = L + config.ropeMax
+      const dxc = cx - rope.ax
+      const dyc = cy - rope.ay
+      const distC = Math.hypot(dxc, dyc)
+      if (distC > maxDist && distC > 0.001) {
+        const nx2 = dxc / distC
+        const ny2 = dyc / distC
+        cx = rope.ax + nx2 * maxDist
+        cy = rope.ay + ny2 * maxDist
+        const vRad = rope.vx * nx2 + rope.vy * ny2
+        if (vRad > 0) {
+          rope.vx -= vRad * nx2
+          rope.vy -= vRad * ny2
+        }
+      }
       drawRope(rope.ax, rope.ay, cx, cy)
       // 视口 clamp（按中心）
       cx = Math.max(WIDGET_W / 2, Math.min(window.innerWidth - WIDGET_W / 2, cx))
@@ -800,7 +820,7 @@ export function WhaleWidget() {
       ropeRafRef.current = requestAnimationFrame(step)
     }
     ropeRafRef.current = requestAnimationFrame(step)
-  }, [config.gravityMode])
+  }, [config.ropeMode, config.gravityMode, config.ropeK, config.ropeDamp, config.ropeMax, config.widgetScale])
 
   const shake = useCallback(() => {
     setBounce(true)
@@ -902,8 +922,8 @@ export function WhaleWidget() {
       dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
       pressStartRef.current = { x: e.clientX, y: e.clientY }
       trackerRef.current.clear()
-      // 0.4：仅重力模式启用绳摆（弹性绳）；悬浮模式保持 0.3.12 的直接跟手手感
-      if (config.gravityMode) {
+      // 0.4：绳摆（弹性绳挂鼠标）与重力是两个独立开关；都没开 = 0.3.12 直接跟手
+      if (config.ropeMode) {
         ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: 0, vy: 0 }
         ropeLenRef.current = 90 * (config.widgetScale || 1)
         startRopeSim()

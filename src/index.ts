@@ -69,8 +69,16 @@ export interface WidgetConfig {
   infoScale: number
   /** 锁定角色与面板大小同步（面板大小=挂件大小） */
   linkScale: boolean
+  /** 绳摆模式：拖拽时角色以弹性绳挂在鼠标上 */
+  ropeMode: boolean
   /** 重力模式：松手落地（关闭=悬浮归位） */
   gravityMode: boolean
+  /** 弹性绳弹簧系数（加速度 = K × 伸长量） */
+  ropeK: number
+  /** 空气阻力系数 0~10（越高收敛越快） */
+  ropeDamp: number
+  /** 弹性上限：绳子最大可伸长量（px），超过后刚性拉住 */
+  ropeMax: number
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -93,7 +101,11 @@ const DEFAULT_CONFIG: WidgetConfig = {
   widgetScale: 1,
   infoScale: 1,
   linkScale: false,
-  gravityMode: false
+  gravityMode: false,
+  ropeMode: false,
+  ropeK: 80,
+  ropeDamp: 3,
+  ropeMax: 150
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -119,7 +131,11 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     widgetScale: Number.isFinite(Number(o.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(o.widgetScale))) : 1,
     infoScale: Number.isFinite(Number(o.infoScale)) ? Math.min(1.5, Math.max(0.6, Number(o.infoScale))) : 1,
     linkScale: o.linkScale === true,
-    gravityMode: o.gravityMode === true
+    gravityMode: o.gravityMode === true,
+    ropeMode: o.ropeMode === true,
+    ropeK: Number.isFinite(Number(o.ropeK)) ? Math.min(200, Math.max(20, Number(o.ropeK))) : 80,
+    ropeDamp: Number.isFinite(Number(o.ropeDamp)) ? Math.min(10, Math.max(0, Number(o.ropeDamp))) : 3,
+    ropeMax: Number.isFinite(Number(o.ropeMax)) ? Math.min(400, Math.max(40, Number(o.ropeMax))) : 150
   }
 }
 
