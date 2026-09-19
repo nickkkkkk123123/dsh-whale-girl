@@ -49,13 +49,15 @@ export interface FlingOptions {
   /** 挂件尺寸（用于边缘碰撞检测和边界计算）。 */
   width: number
   height: number
-  onMove: (x: number, y: number) => void
+  onMove: (x: number, y: number, vx?: number, vy?: number) => void
   onBounce?: (axis: 'x' | 'y') => void
   onDone?: (x: number, y: number) => void
   /** 障碍（信息面板）矩形；角色甩抛撞到它时角色反弹，并回调 onObstacleHit 让面板获得角色的入射动量。 */
   getObstacle?: () => { x: number; y: number; w: number; h: number } | null
   onObstacleHit?: (invx: number, invy: number) => void
-  /** 重力加速度（px/s²）。设置后进入重力模式：自然下落、软着陆（反弹衰减 0.25、落地摩擦滑行）。不设=悬浮模式。 */
+  /** 反弹弹性 0~1（1=完全弹性反射，0.5=损失一半法向速度）。默认 1。 */
+  bounceE?: number
+  /** 重力加速度（px/s²）。设置后进入重力模式：自然下落、软着陆（反弹衰减、落地摩擦滑行）。不设=悬浮模式。 */
   gravity?: number
 }
 
@@ -70,6 +72,7 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
   let vx = opts.vx
   let vy = opts.vy
   const gravity = opts.gravity ?? 0
+  const bounceE = opts.bounceE ?? 1
   let raf = 0
   let last = performance.now()
   let cancelled = false
@@ -126,8 +129,9 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
       const invy = vy
       const dot = vx * nx + vy * ny
       if (dot < 0) {
-        vx = vx - 2 * dot * nx
-        vy = vy - 2 * dot * ny
+        // 弹性反射：法向分量按 bounceE 恢复（1=完全弹性）
+        vx = vx - (1 + bounceE) * dot * nx
+        vy = vy - (1 + bounceE) * dot * ny
       }
       // 最小穿透轴推出：角色被挡在面板一侧，避免瞬移到固定位置
       const overlapW = Math.min(x + opts.width - ob.x, ob.x + ob.w - x)
@@ -145,25 +149,25 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
     // 低速贴边时直接归零速度停在边上——修复贴边时反复触发反弹（音效/特效刷屏）的 bug
     if (x <= b.left) {
       x = b.left
-      if (vx < -120) { vx = -vx; opts.onBounce?.('x') } else if (vx < 0) vx = 0
+      if (vx < -120) { vx = -vx * bounceE; opts.onBounce?.('x') } else if (vx < 0) vx = 0
     } else if (x >= b.right) {
       x = b.right
-      if (vx > 120) { vx = -vx; opts.onBounce?.('x') } else if (vx > 0) vx = 0
+      if (vx > 120) { vx = -vx * bounceE; opts.onBounce?.('x') } else if (vx > 0) vx = 0
     }
     if (y <= b.top) {
       y = b.top
-      if (vy < -120) { vy = -vy; opts.onBounce?.('y') } else if (vy < 0) vy = 0
+      if (vy < -120) { vy = -vy * bounceE; opts.onBounce?.('y') } else if (vy < 0) vy = 0
     } else if (y >= b.bottom) {
       y = b.bottom
       if (gravity > 0) {
-        // 软着陆：反弹衰减 0.25，速度过小直接停（不再重复触发）
-        if (vy > 150) { vy = -vy * 0.25; opts.onBounce?.('y') } else vy = 0
+        // 软着陆：反弹按弹性衰减，速度过小直接停（不再重复触发）
+        if (vy > 150) { vy = -vy * 0.25 * bounceE; opts.onBounce?.('y') } else vy = 0
       } else {
-        if (vy > 120) { vy = -vy; opts.onBounce?.('y') } else if (vy > 0) vy = 0
+        if (vy > 120) { vy = -vy * bounceE; opts.onBounce?.('y') } else if (vy > 0) vy = 0
       }
     }
 
-    opts.onMove(x, y)
+    opts.onMove(x, y, vx, vy)
     raf = requestAnimationFrame(step)
   }
 

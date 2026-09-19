@@ -45,6 +45,8 @@ export interface MenuConfig {
   ropeDamp: number
   /** 弹性上限：绳子最大可伸长量（px），超过后刚性拉住 */
   ropeMax: number
+  /** 角色反弹弹性 0.1~1（1=完全弹性，越小撞墙损失越多） */
+  bounceE: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -84,7 +86,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   ropeMode: false,
   ropeK: 80,
   ropeDamp: 3,
-  ropeMax: 150
+  ropeMax: 150,
+  bounceE: 1
 }
 
 interface Props {
@@ -360,6 +363,21 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
           value={config.ropeMax}
           onChange={(e) => set({ ropeMax: Number(e.target.value) })}
           title="弹性绳最大伸长量（50~300px），超过后刚性拉住"
+        />
+      </div>
+      <div className="wg-menu-title">
+        反弹弹性 <span className="wg-menu-power">{Math.round(config.bounceE * 100)}%</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={0.1}
+          max={1}
+          step={0.05}
+          value={config.bounceE}
+          onChange={(e) => set({ bounceE: Number(e.target.value) })}
+          title="角色反弹弹性（10%~100%，1=撞墙完全不损失速度）"
         />
       </div>
       <div className="wg-menu-divider" />

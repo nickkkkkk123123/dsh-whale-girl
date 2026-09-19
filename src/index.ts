@@ -79,6 +79,8 @@ export interface WidgetConfig {
   ropeDamp: number
   /** 弹性上限：绳子最大可伸长量（px），超过后刚性拉住 */
   ropeMax: number
+  /** 角色反弹弹性 0.1~1（1=完全弹性，越小撞墙损失越多） */
+  bounceE: number
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -105,7 +107,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   ropeMode: false,
   ropeK: 80,
   ropeDamp: 3,
-  ropeMax: 150
+  ropeMax: 150,
+  bounceE: 1
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -135,7 +138,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     ropeMode: o.ropeMode === true,
     ropeK: Number.isFinite(Number(o.ropeK)) ? Math.min(200, Math.max(20, Number(o.ropeK))) : 80,
     ropeDamp: Number.isFinite(Number(o.ropeDamp)) ? Math.min(10, Math.max(0, Number(o.ropeDamp))) : 3,
-    ropeMax: Number.isFinite(Number(o.ropeMax)) ? Math.min(400, Math.max(40, Number(o.ropeMax))) : 150
+    ropeMax: Number.isFinite(Number(o.ropeMax)) ? Math.min(400, Math.max(40, Number(o.ropeMax))) : 150,
+    bounceE: Number.isFinite(Number(o.bounceE)) ? Math.min(1, Math.max(0.1, Number(o.bounceE))) : 1
   }
 }
 

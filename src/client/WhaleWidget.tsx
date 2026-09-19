@@ -132,7 +132,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     ropeMode: any.ropeMode === true,
     ropeK: Number.isFinite(Number(any.ropeK)) ? Math.min(200, Math.max(20, Number(any.ropeK))) : 80,
     ropeDamp: Number.isFinite(Number(any.ropeDamp)) ? Math.min(10, Math.max(0, Number(any.ropeDamp))) : 3,
-    ropeMax: Number.isFinite(Number(any.ropeMax)) ? Math.min(400, Math.max(40, Number(any.ropeMax))) : 150
+    ropeMax: Number.isFinite(Number(any.ropeMax)) ? Math.min(400, Math.max(40, Number(any.ropeMax))) : 150,
+    bounceE: Number.isFinite(Number(any.bounceE)) ? Math.min(1, Math.max(0.1, Number(any.bounceE))) : 1
   }
 }
 
@@ -206,6 +207,8 @@ export function WhaleWidget() {
   const ropeRafRef = useRef(0)
   const ropeLastRef = useRef(0)
   const ropeLenRef = useRef(90)
+  // 角色实时速度（由甩抛 onMove / 面板物理循环回写），运动中抓取时继承动量
+  const roleVelRef = useRef({ x: 0, y: 0 })
   const infoPosRef = useRef(infoPos)
   const infoElRef = useRef<HTMLDivElement>(null)
   const infoModeRef = useRef<'follow' | 'free' | 'returning'>('follow')
@@ -463,6 +466,7 @@ export function WhaleWidget() {
       let rvy = (p.y - lastRolePosRef.current.y) / dt
       const rvm = Math.hypot(rvx, rvy)
       if (rvm > 3000) { rvx = (rvx / rvm) * 3000; rvy = (rvy / rvm) * 3000 }
+      roleVelRef.current = { x: rvx, y: rvy }
       if (infoModeRef.current === 'follow') {
         const k = 0.12
         const nx = infoPosRef.current.x + (anchor.x - infoPosRef.current.x) * k
@@ -502,8 +506,8 @@ export function WhaleWidget() {
             const rely = infoVelRef.current.y - rvy
             const dot = relx * n.x + rely * n.y
             if (dot < 0) {
-              // 反射相对速度的法线分量，面板速度 = 角色速度 + 反射后的相对速度
-              infoVelRef.current = { x: rvx - 2 * dot * n.x, y: rvy - 2 * dot * n.y }
+              // 反射相对速度的法线分量（弹性 = bounceE），面板速度 = 角色速度 + 反射后的相对速度
+              infoVelRef.current = { x: rvx - (1 + config.bounceE) * dot * n.x, y: rvy - (1 + config.bounceE) * dot * n.y }
               const sp = Math.hypot(infoVelRef.current.x, infoVelRef.current.y)
               if (sp < 40) {
                 infoVelRef.current = { x: n.x * 60, y: n.y * 60 }
@@ -523,9 +527,10 @@ export function WhaleWidget() {
                   vy: pvy * 0.7,
                   width: WIDGET_W * ws,
                   height: WIDGET_H * ws,
+                  bounceE: config.bounceE,
                   getObstacle,
                   onObstacleHit: handleObstacleHit,
-                  onMove: (x, y) => setPos({ x, y }),
+                  onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
                   onBounce: (axis) => {
                     bounced = true
                     soundRef.current?.bounce()
@@ -659,9 +664,10 @@ export function WhaleWidget() {
               vy: pvy * 0.7,
               width: WIDGET_W * config.widgetScale,
               height: WIDGET_H * config.widgetScale,
+              bounceE: config.bounceE,
               getObstacle,
               onObstacleHit: handleObstacleHit,
-              onMove: (x, y) => setPos({ x, y }),
+              onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
               onBounce: (axis) => {
                 bounced = true
                 soundRef.current?.bounce()
@@ -925,7 +931,8 @@ export function WhaleWidget() {
       trackerRef.current.clear()
       // 0.4：绳摆（弹性绳挂鼠标）与重力是两个独立开关；都没开 = 0.3.12 直接跟手
       if (config.ropeMode) {
-        ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: 0, vy: 0 }
+        // 运动中抓取：继承角色当前动量（甩飞中途抓住会顺势荡起来，不再瞬间停死）
+        ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: roleVelRef.current.x, vy: roleVelRef.current.y }
         ropeLenRef.current = 90 * (config.widgetScale || 1)
         startRopeSim()
       }
@@ -1028,9 +1035,10 @@ export function WhaleWidget() {
               vy,
               width: WIDGET_W * config.widgetScale,
               height: WIDGET_H * config.widgetScale,
+              bounceE: config.bounceE,
               getObstacle,
               onObstacleHit: handleObstacleHit,
-              onMove: (x, y) => setPos({ x, y }),
+              onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
               onBounce: (axis) => {
                 bounced = true
                 reportEvent('bounce', { axis })
@@ -1094,10 +1102,11 @@ export function WhaleWidget() {
             vy: vel.vy,
             width: WIDGET_W,
             height: WIDGET_H,
+            bounceE: config.bounceE,
             gravity: config.gravityMode ? 2400 : undefined,
             getObstacle,
             onObstacleHit: handleObstacleHit,
-            onMove: (x, y) => setPos({ x, y }),
+            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
             onBounce: (axis) => {
               bounced = true
               reportEvent('bounce', { axis })
@@ -1135,10 +1144,11 @@ export function WhaleWidget() {
             vy: vel ? vel.vy * 0.5 : 0,
             width: WIDGET_W,
             height: WIDGET_H,
+            bounceE: config.bounceE,
             gravity: 2400,
             getObstacle,
             onObstacleHit: handleObstacleHit,
-            onMove: (x, y) => setPos({ x, y }),
+            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
             onBounce: (axis) => {
               bounced = true
               reportEvent('sound', { kind: 'bounce' })
@@ -1198,9 +1208,10 @@ export function WhaleWidget() {
           vy: dy * 5,
           width: WIDGET_W,
           height: WIDGET_H,
+          bounceE: config.bounceE,
           getObstacle,
           onObstacleHit: handleObstacleHit,
-          onMove: (x, y) => setPos({ x, y }),
+          onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
           onBounce: (axis) => {
             bounced = true
             reportEvent('bounce', { axis })
