@@ -805,6 +805,8 @@ export function WhaleWidget() {
     setFlinging(false)
   }, [])
 
+  // 反弹反馈（甩抛与绳摆共用）：音效 + 抖动 + 挤压动画
+
   // 0.4 绳摆模拟：抓取期间每帧推进角色（锚点由 pointermove 更新）
   // 悬浮模式：无重力、带阻尼，松手低速时归位漂浮；重力模式：角色被重力拉着摆到锚点正下方
   const stopRopeSim = useCallback(() => {
@@ -815,6 +817,47 @@ export function WhaleWidget() {
     ropeRef.current = null
     hideRope()
   }, [])
+
+  const shake = useCallback(() => {
+    setBounce(true)
+    window.clearTimeout(bounceTimerRef.current)
+    bounceTimerRef.current = window.setTimeout(() => setBounce(false), 300)
+  }, [])
+
+  /** 弹跳结束后：平滑吸附到最近侧边（保留当前垂直位置）。 */
+  const snap = useCallback((x: number, y: number) => {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const px = Math.max(8, Math.min(vw - WIDGET_W - 8, x))
+    const py = Math.max(8, Math.min(vh - WIDGET_H - 8, y))
+    // 用角色窗口边缘距最近水平边判断（角色贴边才吸附，不因角色宽而误判）
+    const edgeDist = Math.min(x, vw - (x + WIDGET_W))
+    if (edgeDist > EDGE_SNAP_MARGIN) {
+      setPos({ x: px, y: py })
+      return
+    }
+    const left = x + WIDGET_W / 2 < vw / 2 ? 8 : vw - WIDGET_W - 8
+    setPos({ x: Math.max(8, left), y: Math.max(8, Math.min(vh - WIDGET_H - 8, y)) })
+  }, [])
+
+  // 交互诊断上报：通过 postMessage 发给页面顶层 bridge，由 bridge 用带认证的 fetch 上报宿主写日志
+  const reportEvent = useCallback((type: string, extra?: Record<string, unknown>) => {
+    try {
+      window.postMessage({ __wgEvent: { type, ...extra, t: Date.now() } }, '*')
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const bounceFeedback = useCallback((axis: 'x' | 'y') => {
+    reportEvent('bounce', { axis })
+    soundRef.current?.bounce()
+    shake()
+    setBounceAxis(axis)
+    window.clearTimeout(bounceTimerRef.current)
+    bounceTimerRef.current = window.setTimeout(() => setBounceAxis(null), 260)
+  }, [reportEvent, shake])
+
   const startRopeSim = useCallback(() => {
     if (ropeRafRef.current) return
     ropeLastRef.current = performance.now()
@@ -863,6 +906,27 @@ export function WhaleWidget() {
           rope.vy -= vRad * ny2
         }
       }
+      // 0.4.1：甩动撞屏幕边缘 → 触发反弹（按弹性翻转速度 + 音效/挤压反馈），绳摆继续拉拽
+      const m = 8
+      const hitX = cx - WIDGET_W / 2 < m ? -1 : cx + WIDGET_W / 2 > window.innerWidth - m ? 1 : 0
+      if (hitX !== 0) {
+        cx = hitX < 0 ? m + WIDGET_W / 2 : window.innerWidth - m - WIDGET_W / 2
+        const into = hitX < 0 ? rope.vx < 0 : rope.vx > 0
+        if (into && Math.abs(rope.vx) > 120) {
+          rope.vx = -rope.vx * config.bounceE
+          bounceFeedback('x')
+        } else if (into) rope.vx = 0
+      }
+      const hitY = cy - WIDGET_H / 2 < m ? -1 : cy + WIDGET_H / 2 > window.innerHeight - m ? 1 : 0
+      if (hitY !== 0) {
+        cy = hitY < 0 ? m + WIDGET_H / 2 : window.innerHeight - m - WIDGET_H / 2
+        const into = hitY < 0 ? rope.vy < 0 : rope.vy > 0
+        if (into && Math.abs(rope.vy) > 120) {
+          const soft = config.gravityMode && hitY > 0
+          rope.vy = -rope.vy * (soft ? 0.25 * config.bounceE : config.bounceE)
+          bounceFeedback('y')
+        } else if (into) rope.vy = 0
+      }
       drawRope(rope.ax, rope.ay, cx, cy, ropeLenRef.current, config.ropeMax)
       // 绳摆甩动的旋转目标 = 绳偏离竖直方向的角度（角色朝向由弹簧追赶，不瞬贴）
       const ropeDeg = Math.atan2(cx - rope.ax, cy - rope.ay) * (180 / Math.PI)
@@ -875,38 +939,7 @@ export function WhaleWidget() {
       ropeRafRef.current = requestAnimationFrame(step)
     }
     ropeRafRef.current = requestAnimationFrame(step)
-  }, [config.ropeMode, config.gravityMode, config.ropeK, config.ropeDamp, config.ropeMax, config.widgetScale])
-
-  const shake = useCallback(() => {
-    setBounce(true)
-    window.clearTimeout(bounceTimerRef.current)
-    bounceTimerRef.current = window.setTimeout(() => setBounce(false), 300)
-  }, [])
-
-  /** 弹跳结束后：平滑吸附到最近侧边（保留当前垂直位置）。 */
-  const snap = useCallback((x: number, y: number) => {
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const px = Math.max(8, Math.min(vw - WIDGET_W - 8, x))
-    const py = Math.max(8, Math.min(vh - WIDGET_H - 8, y))
-    // 用角色窗口边缘距最近水平边判断（角色贴边才吸附，不因角色宽而误判）
-    const edgeDist = Math.min(x, vw - (x + WIDGET_W))
-    if (edgeDist > EDGE_SNAP_MARGIN) {
-      setPos({ x: px, y: py })
-      return
-    }
-    const left = x + WIDGET_W / 2 < vw / 2 ? 8 : vw - WIDGET_W - 8
-    setPos({ x: Math.max(8, left), y: Math.max(8, Math.min(vh - WIDGET_H - 8, y)) })
-  }, [])
-
-  // 交互诊断上报：通过 postMessage 发给页面顶层 bridge，由 bridge 用带认证的 fetch 上报宿主写日志
-  const reportEvent = useCallback((type: string, extra?: Record<string, unknown>) => {
-    try {
-      window.postMessage({ __wgEvent: { type, ...extra, t: Date.now() } }, '*')
-    } catch {
-      // ignore
-    }
-  }, [])
+  }, [config.ropeMode, config.gravityMode, config.ropeK, config.ropeDamp, config.ropeMax, config.widgetScale, bounceFeedback])
 
   // Agent 工作状态：桥接 5 秒轮询广播（同窗口场景直接读初始值）
   useEffect(() => {
