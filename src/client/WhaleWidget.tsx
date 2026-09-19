@@ -572,6 +572,8 @@ export function WhaleWidget() {
                   width: WIDGET_W * ws,
                   height: WIDGET_H * ws,
                   bounceE: config.bounceE,
+                  gravity: config.gravityMode ? 2400 : undefined,
+                  groundFriction: config.groundFriction,
                   getObstacle,
                   onObstacleHit: handleObstacleHit,
                   onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
@@ -587,7 +589,7 @@ export function WhaleWidget() {
                     flingRef.current = null
                     setFlinging(false)
                     if (!bounced) soundRef.current?.bounce()
-                    snap(x, y)
+                    if (!config.gravityMode) snap(x, y)
                   }
                 })
               }
@@ -710,6 +712,8 @@ export function WhaleWidget() {
               width: WIDGET_W * config.widgetScale,
               height: WIDGET_H * config.widgetScale,
               bounceE: config.bounceE,
+              gravity: config.gravityMode ? 2400 : undefined,
+              groundFriction: config.groundFriction,
               getObstacle,
               onObstacleHit: handleObstacleHit,
               onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
@@ -725,7 +729,7 @@ export function WhaleWidget() {
                 flingRef.current = null
                 setFlinging(false)
                 if (!bounced) soundRef.current?.bounce()
-                snap(x, y)
+                if (!config.gravityMode) snap(x, y)
               }
             })
           }
@@ -1117,6 +1121,8 @@ export function WhaleWidget() {
               width: WIDGET_W * config.widgetScale,
               height: WIDGET_H * config.widgetScale,
               bounceE: config.bounceE,
+              gravity: config.gravityMode ? 2400 : undefined,
+              groundFriction: config.groundFriction,
               getObstacle,
               onObstacleHit: handleObstacleHit,
               onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
@@ -1134,11 +1140,42 @@ export function WhaleWidget() {
                 flingRef.current = null
                 setFlinging(false)
                 if (!bounced) soundRef.current?.bounce()
-                snap(x, y)
+                if (!config.gravityMode) snap(x, y)
               }
             })
           } else {
-            snap(rect.left, rect.top)
+            // 重力模式：弹弓低速也交由重力落体
+            if (config.gravityMode) {
+              setFlinging(true)
+              flingRef.current = startFling({
+                x: rect.left,
+                y: rect.top,
+                vx: 0,
+                vy: 0,
+                width: WIDGET_W * config.widgetScale,
+                height: WIDGET_H * config.widgetScale,
+                bounceE: config.bounceE,
+                gravity: 2400,
+                groundFriction: config.groundFriction,
+                getObstacle,
+                onObstacleHit: handleObstacleHit,
+                onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+                onBounce: (axis) => {
+                  soundRef.current?.bounce()
+                  shake()
+                  setBounceAxis(axis)
+                  window.clearTimeout(bounceTimerRef.current)
+                  bounceTimerRef.current = window.setTimeout(() => setBounceAxis(null), 260)
+                },
+                onDone: (x, y) => {
+                  flingRef.current = null
+                  setFlinging(false)
+                  reportEvent('gravity', { landed: true })
+                }
+              })
+            } else {
+              snap(rect.left, rect.top)
+            }
           }
         }
         return
@@ -1185,6 +1222,7 @@ export function WhaleWidget() {
             height: WIDGET_H,
             bounceE: config.bounceE,
             gravity: config.gravityMode ? 2400 : undefined,
+            groundFriction: config.groundFriction,
             getObstacle,
             onObstacleHit: handleObstacleHit,
             onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
@@ -1317,6 +1355,8 @@ export function WhaleWidget() {
           width: WIDGET_W,
           height: WIDGET_H,
           bounceE: config.bounceE,
+          gravity: config.gravityMode ? 2400 : undefined,
+          groundFriction: config.groundFriction,
           getObstacle,
           onObstacleHit: handleObstacleHit,
           onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; swingTargetRef.current = Math.max(-30, Math.min(30, (vx ?? 0) / 8)); setPos({ x, y }) },
@@ -1335,7 +1375,7 @@ export function WhaleWidget() {
             setFlinging(false)
             // 未撞边（低速）也播一次弹跳完成音
             if (!bounced) soundRef.current?.bounce()
-            snap(x, y)
+            if (!config.gravityMode) snap(x, y)
           }
         })
       }
