@@ -422,6 +422,11 @@ export function WhaleWidget() {
       const roleCx = p.x + roleW / 2
       const roleCy = p.y + roleH / 2
       const roleR = Math.max(22 * ws, Math.min(roleW, roleH) / 2 * 0.9)
+      // 角色速度（上一帧位置差分，供相对速度碰撞使用；首帧跳变用限幅兜底）
+      let rvx = (p.x - lastRolePosRef.current.x) / dt
+      let rvy = (p.y - lastRolePosRef.current.y) / dt
+      const rvm = Math.hypot(rvx, rvy)
+      if (rvm > 3000) { rvx = (rvx / rvm) * 3000; rvy = (rvy / rvm) * 3000 }
       if (infoModeRef.current === 'follow') {
         const k = 0.12
         const nx = infoPosRef.current.x + (anchor.x - infoPosRef.current.x) * k
@@ -455,19 +460,24 @@ export function WhaleWidget() {
           if (n) {
             infoPosRef.current.x = cX(infoPosRef.current.x + n.x * (n.depth + 2))
             infoPosRef.current.y = cY(infoPosRef.current.y + n.y * (n.depth + 2))
-            const dot = infoVelRef.current.x * n.x + infoVelRef.current.y * n.y
-            // 标准反射（保持能量）；面板撞角色后至少沿法线弹开，避免特定速度/角度下卡停
-            infoVelRef.current = { x: infoVelRef.current.x - 2 * dot * n.x, y: infoVelRef.current.y - 2 * dot * n.y }
-            const sp = Math.hypot(infoVelRef.current.x, infoVelRef.current.y)
-            if (sp < 40) {
-              infoVelRef.current = { x: n.x * 60, y: n.y * 60 }
-            }
-            // 对称：角色静止被面板撞到 → 角色进入甩抛（被撞飞，带面板动量）
-            if (!dragging && !flinging) {
-              const pvx = infoVelRef.current.x
-              const pvy = infoVelRef.current.y
-              if (Math.hypot(pvx, pvy) > 60) {
-                setFlinging(true)
+            // v0.3.12：改用**相对速度**（面板 − 角色）判断与反射——角色被甩飞/移动时不再按静止假设错误反弹；
+            // 且仅在相互接近（rel·n < 0）时反射，分离中不再注入能量（修复偶发卡停/抖动）
+            const relx = infoVelRef.current.x - rvx
+            const rely = infoVelRef.current.y - rvy
+            const dot = relx * n.x + rely * n.y
+            if (dot < 0) {
+              // 反射相对速度的法线分量，面板速度 = 角色速度 + 反射后的相对速度
+              infoVelRef.current = { x: rvx - 2 * dot * n.x, y: rvy - 2 * dot * n.y }
+              const sp = Math.hypot(infoVelRef.current.x, infoVelRef.current.y)
+              if (sp < 40) {
+                infoVelRef.current = { x: n.x * 60, y: n.y * 60 }
+              }
+              // 对称：角色静止被面板撞到 → 角色进入甩抛（被撞飞，带面板动量）
+              if (!dragging && !flinging) {
+                const pvx = infoVelRef.current.x
+                const pvy = infoVelRef.current.y
+                if (Math.hypot(pvx, pvy) > 60) {
+                  setFlinging(true)
                 flingRef.current?.cancel()
                 let bounced = false
                 flingRef.current = startFling({
@@ -497,6 +507,7 @@ export function WhaleWidget() {
                 })
               }
             }
+          }
           }
           if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
         }
