@@ -69,6 +69,8 @@ export interface WidgetConfig {
   infoScale: number
   /** 锁定角色与面板大小同步（面板大小=挂件大小） */
   linkScale: boolean
+  /** 重力模式：松手落地（关闭=悬浮归位） */
+  gravityMode: boolean
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -90,7 +92,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   pauseOnThinking: true,
   widgetScale: 1,
   infoScale: 1,
-  linkScale: false
+  linkScale: false,
+  gravityMode: false
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -115,7 +118,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     pauseOnThinking: o.pauseOnThinking !== false,
     widgetScale: Number.isFinite(Number(o.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(o.widgetScale))) : 1,
     infoScale: Number.isFinite(Number(o.infoScale)) ? Math.min(1.5, Math.max(0.6, Number(o.infoScale))) : 1,
-    linkScale: o.linkScale === true
+    linkScale: o.linkScale === true,
+    gravityMode: o.gravityMode === true
   }
 }
 

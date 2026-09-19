@@ -55,6 +55,8 @@ export interface FlingOptions {
   /** 障碍（信息面板）矩形；角色甩抛撞到它时角色反弹，并回调 onObstacleHit 让面板获得角色的入射动量。 */
   getObstacle?: () => { x: number; y: number; w: number; h: number } | null
   onObstacleHit?: (invx: number, invy: number) => void
+  /** 重力加速度（px/s²）。设置后进入重力模式：自然下落、软着陆（反弹衰减 0.25、落地摩擦滑行）。不设=悬浮模式。 */
+  gravity?: number
 }
 
 const STOP_SPEED = 34
@@ -67,6 +69,7 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
   let y = opts.y
   let vx = opts.vx
   let vy = opts.vy
+  const gravity = opts.gravity ?? 0
   let raf = 0
   let last = performance.now()
   let cancelled = false
@@ -83,15 +86,28 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
     const dt = Math.min(MAX_DT, (now - last) / 1000)
     last = now
 
-    if (Math.hypot(vx, vy) < STOP_SPEED) {
+    if (gravity > 0) {
+      vy += gravity * dt
+      const gb = bounds()
+      if (y >= gb.bottom - 0.5) {
+        // 落地滑行：地面摩擦 + 速度足够小则结束
+        vx *= Math.pow(0.92, dt * 60)
+        if (Math.hypot(vx, vy) < STOP_SPEED) {
+          opts.onDone?.(x, y)
+          return
+        }
+      }
+    } else if (Math.hypot(vx, vy) < STOP_SPEED) {
       opts.onDone?.(x, y)
       return
     }
 
-    // 摩擦：按 60fps 基准折算每帧 ×FRICTION，帧率越高每秒减速越平滑
-    const f = Math.pow(FRICTION_PER_FRAME, dt * 60)
-    vx *= f
-    vy *= f
+    if (!(gravity > 0)) {
+      // 摩擦：按 60fps 基准折算每帧 ×FRICTION，帧率越高每秒减速越平滑（仅悬浮模式）
+      const f = Math.pow(FRICTION_PER_FRAME, dt * 60)
+      vx *= f
+      vy *= f
+    }
 
     x += vx * dt
     y += vy * dt
@@ -140,7 +156,8 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
       opts.onBounce?.('y')
     } else if (y >= b.bottom) {
       y = b.bottom
-      vy = -Math.abs(vy)
+      vy = gravity > 0 ? -Math.abs(vy) * 0.25 : -Math.abs(vy)
+      if (gravity > 0 && Math.abs(vy) < 90) vy = 0
       opts.onBounce?.('y')
     }
 

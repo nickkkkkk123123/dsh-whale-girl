@@ -35,6 +35,8 @@ export interface MenuConfig {
   infoScale: number
   /** 锁定角色与面板大小同步（面板大小=挂件大小） */
   linkScale: boolean
+  /** 重力模式：松手落地（关闭=悬浮归位） */
+  gravityMode: boolean
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -69,7 +71,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   pauseOnThinking: true,
   widgetScale: 1,
   infoScale: 1,
-  linkScale: false
+  linkScale: false,
+  gravityMode: false
 }
 
 interface Props {
@@ -295,6 +298,9 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
       </div>
       <div className="wg-menu-item" onClick={() => set({ linkScale: !config.linkScale })}>
         <span className={`wg-menu-check${config.linkScale ? ' on' : ''}`} /> 锁定角色与面板大小同步
+      </div>
+      <div className="wg-menu-item" onClick={() => set({ gravityMode: !config.gravityMode })}>
+        <span className={`wg-menu-check${config.gravityMode ? ' on' : ''}`} /> 重力模式（松手落地）
       </div>
       <div className="wg-menu-divider" />
       <div className="wg-menu-item" onClick={onResetPosition}>↺ 恢复默认位置</div>

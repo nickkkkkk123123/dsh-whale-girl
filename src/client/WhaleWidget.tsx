@@ -101,7 +101,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     pauseOnThinking: any.pauseOnThinking !== false,
     widgetScale: Number.isFinite(Number(any.widgetScale)) ? Math.min(1.5, Math.max(0.6, Number(any.widgetScale))) : 1,
     infoScale: Number.isFinite(Number(any.infoScale)) ? Math.min(1.5, Math.max(0.6, Number(any.infoScale))) : 1,
-    linkScale: any.linkScale === true
+    linkScale: any.linkScale === true,
+    gravityMode: any.gravityMode === true
   }
 }
 
@@ -170,6 +171,11 @@ export function WhaleWidget() {
   // 空闲彩蛋计时器
   const idleEggTimerRef = useRef(0)
   const trackerRef = useRef(new FlingTracker())
+  // 0.4 绳摆：抓取时鼠标为锚点，角色以固定绳长挂在锚点上摆动
+  const ropeRef = useRef<{ ax: number; ay: number; vx: number; vy: number } | null>(null)
+  const ropeRafRef = useRef(0)
+  const ropeLastRef = useRef(0)
+  const ropeLenRef = useRef(90)
   const infoPosRef = useRef(infoPos)
   const infoElRef = useRef<HTMLDivElement>(null)
   const infoModeRef = useRef<'follow' | 'free' | 'returning'>('follow')
@@ -718,6 +724,61 @@ export function WhaleWidget() {
     setFlinging(false)
   }, [])
 
+  // 0.4 绳摆模拟：抓取期间每帧推进角色（锚点由 pointermove 更新）
+  // 悬浮模式：无重力、带阻尼，松手低速时归位漂浮；重力模式：角色被重力拉着摆到锚点正下方
+  const stopRopeSim = useCallback(() => {
+    if (ropeRafRef.current) {
+      cancelAnimationFrame(ropeRafRef.current)
+      ropeRafRef.current = 0
+    }
+    ropeRef.current = null
+  }, [])
+  const startRopeSim = useCallback(() => {
+    if (ropeRafRef.current) return
+    ropeLastRef.current = performance.now()
+    const step = (now: number) => {
+      const rope = ropeRef.current
+      if (!rope) {
+        ropeRafRef.current = 0
+        return
+      }
+      const dt = Math.min(0.05, (now - ropeLastRef.current) / 1000)
+      ropeLastRef.current = now
+      if (config.gravityMode) rope.vy += 2400 * dt
+      else {
+        const f = Math.pow(0.995, dt * 60)
+        rope.vx *= f
+        rope.vy *= f
+      }
+      // 积分（以角色中心为摆锤）
+      let cx = posRef.current.x + WIDGET_W / 2 + rope.vx * dt
+      let cy = posRef.current.y + WIDGET_H / 2 + rope.vy * dt
+      // 绳约束：中心到锚点距离 ≤ 绳长，超出则拉回并消去径向速度（保留切向 → 摆动/旋转自然产生）
+      const dx = cx - rope.ax
+      const dy = cy - rope.ay
+      const dist = Math.hypot(dx, dy)
+      const L = ropeLenRef.current
+      if (dist > L && dist > 0.001) {
+        const nx2 = dx / dist
+        const ny2 = dy / dist
+        cx = rope.ax + nx2 * L
+        cy = rope.ay + ny2 * L
+        const vRad = rope.vx * nx2 + rope.vy * ny2
+        if (vRad > 0) {
+          rope.vx -= vRad * nx2
+          rope.vy -= vRad * ny2
+        }
+      }
+      // 视口 clamp（按中心）
+      cx = Math.max(WIDGET_W / 2, Math.min(window.innerWidth - WIDGET_W / 2, cx))
+      cy = Math.max(WIDGET_H / 2, Math.min(window.innerHeight - WIDGET_H / 2, cy))
+      posRef.current = { x: cx - WIDGET_W / 2, y: cy - WIDGET_H / 2 }
+      setPos(posRef.current)
+      ropeRafRef.current = requestAnimationFrame(step)
+    }
+    ropeRafRef.current = requestAnimationFrame(step)
+  }, [config.gravityMode])
+
   const shake = useCallback(() => {
     setBounce(true)
     window.clearTimeout(bounceTimerRef.current)
@@ -818,6 +879,10 @@ export function WhaleWidget() {
       dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
       pressStartRef.current = { x: e.clientX, y: e.clientY }
       trackerRef.current.clear()
+      // 0.4 绳摆：抓取 = 鼠标成为锚点，角色以固定绳长挂上去（绳长随挂件大小缩放）
+      ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: 0, vy: 0 }
+      ropeLenRef.current = 90 * (config.widgetScale || 1)
+      startRopeSim()
       setPressed(true)
       setDragging(true)
       soundRef.current?.unlock()
@@ -831,7 +896,7 @@ export function WhaleWidget() {
         // ignore
       }
     },
-    [stopFling, markActive, reportEvent]
+    [stopFling, startRopeSim, markActive, config.widgetScale, reportEvent]
   )
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
@@ -849,6 +914,13 @@ export function WhaleWidget() {
       return
     }
     trackerRef.current.push(e.clientX, e.clientY)
+    // 0.4 绳摆：鼠标只更新锚点，角色位置由绳摆模拟推进（拖动产生摆动，松手带切向速度飞出）
+    const rope = ropeRef.current
+    if (rope) {
+      rope.ax = e.clientX
+      rope.ay = e.clientY
+      return
+    }
     let nx = Math.max(0, Math.min(window.innerWidth - WIDGET_W, e.clientX - dragRef.current.dx))
     let ny = Math.max(0, Math.min(window.innerHeight - WIDGET_H, e.clientY - dragRef.current.dy))
     // 拖拽角色撞到信息面板：角色始终跟随鼠标（不挡回），面板被角色有力推开让位
@@ -938,7 +1010,10 @@ export function WhaleWidget() {
       }
       const start = pressStartRef.current
       const moved = start !== null && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6
-      const vel = trackerRef.current.velocity()
+      // 0.4：松手速度优先取绳摆模拟的摆锤速度（真实摆动末速，比指针采样准确）
+      const ropeV = ropeRef.current ? { vx: ropeRef.current.vx, vy: ropeRef.current.vy } : null
+      stopRopeSim()
+      const vel = ropeV ?? trackerRef.current.velocity()
       trackerRef.current.clear()
       dragRef.current = null
       pressStartRef.current = null
@@ -973,6 +1048,7 @@ export function WhaleWidget() {
             vy: vel.vy,
             width: WIDGET_W,
             height: WIDGET_H,
+            gravity: config.gravityMode ? 2400 : undefined,
             getObstacle,
             onObstacleHit: handleObstacleHit,
             onMove: (x, y) => setPos({ x, y }),
@@ -994,7 +1070,43 @@ export function WhaleWidget() {
                 soundRef.current?.bounce()
                 reportEvent('sound', { kind: 'bounce' })
               }
-              snap(x, y)
+              if (!config.gravityMode) snap(x, y)
+              else reportEvent('gravity', { landed: true })
+            }
+          })
+        }
+      } else if (config.gravityMode && !moved) {
+        // 重力模式慢速松手：直接松爪，角色自由落体软着陆
+        const el = rootRef.current
+        if (el) {
+          const rect = el.getBoundingClientRect()
+          setFlinging(true)
+          let bounced = false
+          flingRef.current = startFling({
+            x: rect.left,
+            y: rect.top,
+            vx: vel ? vel.vx * 0.5 : 0,
+            vy: vel ? vel.vy * 0.5 : 0,
+            width: WIDGET_W,
+            height: WIDGET_H,
+            gravity: 2400,
+            getObstacle,
+            onObstacleHit: handleObstacleHit,
+            onMove: (x, y) => setPos({ x, y }),
+            onBounce: (axis) => {
+              bounced = true
+              reportEvent('sound', { kind: 'bounce' })
+              soundRef.current?.bounce()
+              shake()
+              setBounceAxis(axis)
+              window.clearTimeout(bounceTimerRef.current)
+              bounceTimerRef.current = window.setTimeout(() => setBounceAxis(null), 260)
+            },
+            onDone: (x, y) => {
+              flingRef.current = null
+              setFlinging(false)
+              if (!bounced) soundRef.current?.bounce()
+              reportEvent('gravity', { landed: true })
             }
           })
         }
@@ -1013,7 +1125,7 @@ export function WhaleWidget() {
         // ignore
       }
     },
-    [shake, snap, config.showBubble, config.slingPower, reportEvent]
+    [shake, snap, config.showBubble, config.slingPower, config.gravityMode, stopRopeSim, reportEvent]
   )
 
   // 窗口变化：把挂件 clamp 回窗口内，并依据相对位移给动量，让它在窗口内反弹
