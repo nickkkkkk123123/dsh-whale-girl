@@ -550,7 +550,8 @@ export function WhaleWidget() {
             }
           }
           }
-          if (now - freeStartRef.current > FREE_MS) infoModeRef.current = 'returning'
+          // 重力模式：面板保持自由（不自动归位到角色下方）
+          if (now - freeStartRef.current > FREE_MS && !config.gravityMode) infoModeRef.current = 'returning'
         }
       } else {
         // returning：向角色下方移动；到达且角色静止则跟随，否则继续追
@@ -1167,10 +1168,35 @@ export function WhaleWidget() {
           })
         }
       } else {
-        // 慢速拖拽：正常吸附
+        // 慢速拖拽：悬浮模式吸附归位；重力模式就地软着陆（不再 snap 回悬浮，避免重力"消失"）
         const el = rootRef.current
-        if (el) {
-          const rect = el.getBoundingClientRect()
+        const rect = el?.getBoundingClientRect()
+        if (rect && config.gravityMode) {
+          setFlinging(true)
+          let bounced = false
+          flingRef.current = startFling({
+            x: rect.left,
+            y: rect.top,
+            vx: vel ? vel.vx * 0.5 : 0,
+            vy: vel ? vel.vy * 0.5 : 0,
+            width: WIDGET_W,
+            height: WIDGET_H,
+            bounceE: config.bounceE,
+            gravity: 2400,
+            getObstacle,
+            onObstacleHit: handleObstacleHit,
+            onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
+            onBounce: (axis) => {
+              reportEvent('sound', { kind: 'bounce' })
+              soundRef.current?.bounce()
+            },
+            onDone: (x, y) => {
+              flingRef.current = null
+              setFlinging(false)
+              reportEvent('gravity', { landed: true })
+            }
+          })
+        } else if (rect) {
           snap(rect.left, rect.top)
         }
       }
@@ -1241,7 +1267,7 @@ export function WhaleWidget() {
       <style>{WIDGET_CSS}</style>
       <div
         ref={rootRef}
-        className={`wg-root${dragging ? ' wg-dragging' : ''}${flinging ? ' wg-flinging' : ''}${bounce ? ' wg-bounce' : ''}${bounceAxis === 'x' ? ' wg-squash-x' : ''}${bounceAxis === 'y' ? ' wg-squash-y' : ''}${petted ? ' wg-pet' : ''}${config.ecoMode && ecoIdle ? ' wg-eco' : ''}${pos.x + WIDGET_W / 2 < window.innerWidth / 2 ? ' wg-flip' : ''}`}
+        className={`wg-root${dragging ? ' wg-dragging' : ''}${flinging ? ' wg-flinging' : ''}${bounce ? ' wg-bounce' : ''}${bounceAxis === 'x' ? ' wg-squash-x' : ''}${bounceAxis === 'y' ? ' wg-squash-y' : ''}${petted ? ' wg-pet' : ''}${config.ecoMode && ecoIdle ? ' wg-eco' : ''}${config.gravityMode ? ' wg-gravity' : ''}${pos.x + WIDGET_W / 2 < window.innerWidth / 2 ? ' wg-flip' : ''}`}
         style={
           {
             left: 0,

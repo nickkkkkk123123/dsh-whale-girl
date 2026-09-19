@@ -81,6 +81,10 @@ export const WIDGET_CSS = `
   animation: wg-float 3.4s ease-in-out infinite;
   filter: drop-shadow(0 4px 10px rgba(30, 50, 120, 0.18));
 }
+/* 重力模式：角色落地后不再悬浮呼吸（悬浮动画只在悬浮模式跑） */
+.wg-root.wg-gravity .wg-img {
+  animation: none;
+}
 /* 角色吸附窗口左部时镜像翻转（面向右，贴合成窗沿），带平滑的 3D 翻转动画 */
 .wg-flip {
   --wg-flip: -1;
