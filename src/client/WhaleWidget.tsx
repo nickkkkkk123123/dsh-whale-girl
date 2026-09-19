@@ -31,6 +31,32 @@ const CONFIG_KEY = 'whale-girl-config'
 const SLING_HINT = '悄悄告诉你：按住中键拖拽再松手，我会像弹弓一样发射！右键菜单可以调发射力度哦～'
 
 const WIDGET_W = 170
+
+// 0.4 弹性绳可视化：全屏覆盖层（直写 DOM，不触发 React 渲染）
+let ropeOverlay: { svg: SVGSVGElement; line: SVGLineElement } | null = null
+function drawRope(x1: number, y1: number, x2: number, y2: number) {
+  if (!ropeOverlay) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+    svg.style.cssText = "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2147483646"
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line")
+    line.setAttribute("stroke", "rgba(90,150,255,0.9)")
+    line.setAttribute("stroke-width", "3")
+    line.setAttribute("stroke-linecap", "round")
+    svg.appendChild(line)
+    document.body.appendChild(svg)
+    ropeOverlay = { svg, line }
+  }
+  ropeOverlay.svg.style.display = "block"
+  ropeOverlay.line.setAttribute("x1", String(x1))
+  ropeOverlay.line.setAttribute("y1", String(y1))
+  ropeOverlay.line.setAttribute("x2", String(x2))
+  ropeOverlay.line.setAttribute("y2", String(y2))
+}
+function hideRope() {
+  if (ropeOverlay) ropeOverlay.svg.style.display = "none"
+}
+/** 弹性绳弹簧系数：加速度 = K × 伸长量（px/s² 每 px）。 */
+const ROPE_K = 80
 const WIDGET_H = 180
 /** 松手速度（px/s）超过此值进入甩抛弹跳模式。 */
 const FLING_SPEED = 800
@@ -732,6 +758,7 @@ export function WhaleWidget() {
       ropeRafRef.current = 0
     }
     ropeRef.current = null
+    hideRope()
   }, [])
   const startRopeSim = useCallback(() => {
     if (ropeRafRef.current) return
@@ -744,31 +771,27 @@ export function WhaleWidget() {
       }
       const dt = Math.min(0.05, (now - ropeLastRef.current) / 1000)
       ropeLastRef.current = now
-      if (config.gravityMode) rope.vy += 2400 * dt
-      else {
-        const f = Math.pow(0.995, dt * 60)
-        rope.vx *= f
-        rope.vy *= f
-      }
-      // 积分（以角色中心为摆锤）
-      let cx = posRef.current.x + WIDGET_W / 2 + rope.vx * dt
-      let cy = posRef.current.y + WIDGET_H / 2 + rope.vy * dt
-      // 绳约束：中心到锚点距离 ≤ 绳长，超出则拉回并消去径向速度（保留切向 → 摆动/旋转自然产生）
-      const dx = cx - rope.ax
-      const dy = cy - rope.ay
+      // 重力 + 弹性绳：绳长为自然长度，超出部分产生弹簧拉力（越拉越狠），角色会被"弹"回来
+      rope.vy += (config.gravityMode ? 2400 : 0) * dt
+      const cpx = posRef.current.x + WIDGET_W / 2
+      const cpy = posRef.current.y + WIDGET_H / 2
+      const dx = cpx - rope.ax
+      const dy = cpy - rope.ay
       const dist = Math.hypot(dx, dy)
       const L = ropeLenRef.current
       if (dist > L && dist > 0.001) {
-        const nx2 = dx / dist
-        const ny2 = dy / dist
-        cx = rope.ax + nx2 * L
-        cy = rope.ay + ny2 * L
-        const vRad = rope.vx * nx2 + rope.vy * ny2
-        if (vRad > 0) {
-          rope.vx -= vRad * nx2
-          rope.vy -= vRad * ny2
-        }
+        const f = ROPE_K * (dist - L)
+        rope.vx -= (dx / dist) * f * dt
+        rope.vy -= (dy / dist) * f * dt
       }
+      // 空气阻尼：让弹性绳的震荡收敛
+      const damp = Math.pow(0.99, dt * 60)
+      rope.vx *= damp
+      rope.vy *= damp
+      // 积分（以角色中心为摆锤）
+      let cx = cpx + rope.vx * dt
+      let cy = cpy + rope.vy * dt
+      drawRope(rope.ax, rope.ay, cx, cy)
       // 视口 clamp（按中心）
       cx = Math.max(WIDGET_W / 2, Math.min(window.innerWidth - WIDGET_W / 2, cx))
       cy = Math.max(WIDGET_H / 2, Math.min(window.innerHeight - WIDGET_H / 2, cy))
@@ -879,10 +902,12 @@ export function WhaleWidget() {
       dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
       pressStartRef.current = { x: e.clientX, y: e.clientY }
       trackerRef.current.clear()
-      // 0.4 绳摆：抓取 = 鼠标成为锚点，角色以固定绳长挂上去（绳长随挂件大小缩放）
-      ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: 0, vy: 0 }
-      ropeLenRef.current = 90 * (config.widgetScale || 1)
-      startRopeSim()
+      // 0.4：仅重力模式启用绳摆（弹性绳）；悬浮模式保持 0.3.12 的直接跟手手感
+      if (config.gravityMode) {
+        ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: 0, vy: 0 }
+        ropeLenRef.current = 90 * (config.widgetScale || 1)
+        startRopeSim()
+      }
       setPressed(true)
       setDragging(true)
       soundRef.current?.unlock()
