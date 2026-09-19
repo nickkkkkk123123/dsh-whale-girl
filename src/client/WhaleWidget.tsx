@@ -788,10 +788,11 @@ export function WhaleWidget() {
         rope.vx -= (dx / dist) * f * dt
         rope.vy -= (dy / dist) * f * dt
       }
-      // 空气阻尼：阻力系数 0~10 → 每帧衰减（让弹性震荡收敛快慢可调）
+      // 空气阻尼：重力模式下只衰减水平速度（重力加速度恒定保持，不因阻力减弱——物体应持续有向下加速度）；
+      // 无重力的绳-only 模式才全轴衰减（让弹性震荡收敛）
       const damp = Math.pow(1 - config.ropeDamp * 0.008, dt * 60)
       rope.vx *= damp
-      rope.vy *= damp
+      if (!config.gravityMode) rope.vy *= damp
       // 积分（以角色中心为摆锤）
       let cx = cpx + rope.vx * dt
       let cy = cpy + rope.vy * dt

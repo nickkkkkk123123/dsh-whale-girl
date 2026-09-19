@@ -362,9 +362,6 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
           title="弹性绳最大伸长量（50~300px），超过后刚性拉住"
         />
       </div>
-      <div className="wg-menu-item" onClick={() => set({ gravityMode: !config.gravityMode })}>
-        <span className={`wg-menu-check${config.gravityMode ? ' on' : ''}`} /> 重力模式（松手落地）
-      </div>
       <div className="wg-menu-divider" />
       <div className="wg-menu-item" onClick={onResetPosition}>↺ 恢复默认位置</div>
     </div>
