@@ -57,6 +57,8 @@ export interface FlingOptions {
   onObstacleHit?: (invx: number, invy: number) => void
   /** 反弹弹性 0~1（1=完全弹性反射，0.5=损失一半法向速度）。默认 1。 */
   bounceE?: number
+  /** 重力模式下落地滑行的地面摩擦（每帧系数，0.85 很滑 ~ 0.99 很涩）。默认 0.95。 */
+  groundFriction?: number
   /** 重力加速度（px/s²）。设置后进入重力模式：自然下落、软着陆（反弹衰减、落地摩擦滑行）。不设=悬浮模式。 */
   gravity?: number
 }
@@ -73,6 +75,7 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
   let vy = opts.vy
   const gravity = opts.gravity ?? 0
   const bounceE = opts.bounceE ?? 1
+  const groundFriction = opts.groundFriction ?? 0.95
   let raf = 0
   let last = performance.now()
   let cancelled = false
@@ -93,8 +96,8 @@ export function startFling(opts: FlingOptions): { cancel: () => void } {
       vy += gravity * dt
       const gb = bounds()
       if (y >= gb.bottom - 0.5) {
-        // 落地滑行：地面摩擦 + 速度足够小则结束
-        vx *= Math.pow(0.92, dt * 60)
+        // 落地滑行：地面摩擦可调 + 速度足够小则结束
+        vx *= Math.pow(groundFriction, dt * 60)
         if (Math.hypot(vx, vy) < STOP_SPEED) {
           opts.onDone?.(x, y)
           return

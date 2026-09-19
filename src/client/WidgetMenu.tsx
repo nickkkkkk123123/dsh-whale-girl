@@ -47,6 +47,8 @@ export interface MenuConfig {
   ropeMax: number
   /** 角色反弹弹性 0.1~1（1=完全弹性，越小撞墙损失越多） */
   bounceE: number
+  /** 重力模式落地滑行的地面摩擦 0.8~0.99（越小越滑） */
+  groundFriction: number
 }
 
 /** API 提供方条目（host /api/providers 返回）。 */
@@ -87,7 +89,8 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
   ropeK: 80,
   ropeDamp: 3,
   ropeMax: 150,
-  bounceE: 1
+  bounceE: 1,
+  groundFriction: 0.95
 }
 
 interface Props {
@@ -378,6 +381,21 @@ export function WidgetMenu({ x, y, config, onChange, onResetPosition, onClose, p
           value={config.bounceE}
           onChange={(e) => set({ bounceE: Number(e.target.value) })}
           title="角色反弹弹性（10%~100%，1=撞墙完全不损失速度）"
+        />
+      </div>
+      <div className="wg-menu-title">
+        地面摩擦 <span className="wg-menu-power">{config.groundFriction.toFixed(2)}</span>
+      </div>
+      <div className="wg-menu-slider-row">
+        <input
+          className="wg-menu-slider"
+          type="range"
+          min={0.8}
+          max={0.99}
+          step={0.01}
+          value={config.groundFriction}
+          onChange={(e) => set({ groundFriction: Number(e.target.value) })}
+          title="重力模式落地滑行的地面摩擦（越小越滑，越大越涩）"
         />
       </div>
       <div className="wg-menu-divider" />

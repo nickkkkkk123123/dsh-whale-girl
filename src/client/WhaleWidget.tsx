@@ -133,7 +133,8 @@ function normalizeConfig(o: unknown): MenuConfig {
     ropeK: Number.isFinite(Number(any.ropeK)) ? Math.min(200, Math.max(20, Number(any.ropeK))) : 80,
     ropeDamp: Number.isFinite(Number(any.ropeDamp)) ? Math.min(10, Math.max(0, Number(any.ropeDamp))) : 3,
     ropeMax: Number.isFinite(Number(any.ropeMax)) ? Math.min(400, Math.max(40, Number(any.ropeMax))) : 150,
-    bounceE: Number.isFinite(Number(any.bounceE)) ? Math.min(1, Math.max(0.1, Number(any.bounceE))) : 1
+    bounceE: Number.isFinite(Number(any.bounceE)) ? Math.min(1, Math.max(0.1, Number(any.bounceE))) : 1,
+    groundFriction: Number.isFinite(Number(any.groundFriction)) ? Math.min(0.99, Math.max(0.8, Number(any.groundFriction))) : 0.95
   }
 }
 
@@ -770,6 +771,9 @@ export function WhaleWidget() {
     }
     ropeRef.current = null
     hideRope()
+    // 归零绳摆旋转表现
+    const swingImg = rootRef.current?.querySelector('.wg-img') as HTMLElement | null
+    if (swingImg) swingImg.style.transform = ''
   }, [])
   const startRopeSim = useCallback(() => {
     if (ropeRafRef.current) return
@@ -820,6 +824,12 @@ export function WhaleWidget() {
         }
       }
       drawRope(rope.ax, rope.ay, cx, cy)
+      // 绳摆甩动的旋转表现：角色随绳角度倾斜（竖直下垂为 0°，随甩动摆到 ±40°）
+      const swingImg = rootRef.current?.querySelector('.wg-img') as HTMLElement | null
+      if (swingImg) {
+        const ang = Math.atan2(cx - rope.ax, cy - rope.ay) * (180 / Math.PI)
+        swingImg.style.transform = `rotate(${Math.max(-40, Math.min(40, ang))}deg)`
+      }
       // 视口 clamp（按中心）
       cx = Math.max(WIDGET_W / 2, Math.min(window.innerWidth - WIDGET_W / 2, cx))
       cy = Math.max(WIDGET_H / 2, Math.min(window.innerHeight - WIDGET_H / 2, cy))
@@ -1147,6 +1157,7 @@ export function WhaleWidget() {
             height: WIDGET_H,
             bounceE: config.bounceE,
             gravity: 2400,
+            groundFriction: config.groundFriction,
             getObstacle,
             onObstacleHit: handleObstacleHit,
             onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },
@@ -1183,6 +1194,7 @@ export function WhaleWidget() {
             height: WIDGET_H,
             bounceE: config.bounceE,
             gravity: 2400,
+            groundFriction: config.groundFriction,
             getObstacle,
             onObstacleHit: handleObstacleHit,
             onMove: (x, y, vx, vy) => { roleVelRef.current = { x: vx ?? 0, y: vy ?? 0 }; setPos({ x, y }) },

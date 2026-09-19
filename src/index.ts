@@ -81,6 +81,8 @@ export interface WidgetConfig {
   ropeMax: number
   /** 角色反弹弹性 0.1~1（1=完全弹性，越小撞墙损失越多） */
   bounceE: number
+  /** 重力模式落地滑行的地面摩擦 0.8~0.99（越小越滑） */
+  groundFriction: number
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -108,7 +110,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   ropeK: 80,
   ropeDamp: 3,
   ropeMax: 150,
-  bounceE: 1
+  bounceE: 1,
+  groundFriction: 0.95
 }
 
 function normalizeConfig(raw: unknown): WidgetConfig {
@@ -139,7 +142,8 @@ function normalizeConfig(raw: unknown): WidgetConfig {
     ropeK: Number.isFinite(Number(o.ropeK)) ? Math.min(200, Math.max(20, Number(o.ropeK))) : 80,
     ropeDamp: Number.isFinite(Number(o.ropeDamp)) ? Math.min(10, Math.max(0, Number(o.ropeDamp))) : 3,
     ropeMax: Number.isFinite(Number(o.ropeMax)) ? Math.min(400, Math.max(40, Number(o.ropeMax))) : 150,
-    bounceE: Number.isFinite(Number(o.bounceE)) ? Math.min(1, Math.max(0.1, Number(o.bounceE))) : 1
+    bounceE: Number.isFinite(Number(o.bounceE)) ? Math.min(1, Math.max(0.1, Number(o.bounceE))) : 1,
+    groundFriction: Number.isFinite(Number(o.groundFriction)) ? Math.min(0.99, Math.max(0.8, Number(o.groundFriction))) : 0.95
   }
 }
 
