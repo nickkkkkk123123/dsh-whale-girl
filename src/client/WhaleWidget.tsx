@@ -240,6 +240,8 @@ export function WhaleWidget() {
   const ropeRafRef = useRef(0)
   const ropeLastRef = useRef(0)
   const ropeLenRef = useRef(90)
+  // 绳摆延迟激活：位移超过阈值才激活（纯点击=摸头，不触发绳子下坠）
+  const ropePendingRef = useRef(false)
   // 角色实时速度（由甩抛 onMove / 面板物理循环回写），运动中抓取时继承动量
   const roleVelRef = useRef({ x: 0, y: 0 })
   // 0.4 旋转表现：角色朝向用欠阻尼弹簧追赶目标角度（滞后+过冲=摆动更真实）
@@ -1015,12 +1017,8 @@ export function WhaleWidget() {
       pressStartRef.current = { x: e.clientX, y: e.clientY }
       trackerRef.current.clear()
       // 0.4：绳摆（弹性绳挂鼠标）与重力是两个独立开关；都没开 = 0.3.12 直接跟手
-      if (config.ropeMode) {
-        // 运动中抓取：继承角色当前动量（甩飞中途抓住会顺势荡起来，不再瞬间停死）
-        ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: roleVelRef.current.x, vy: roleVelRef.current.y }
-        ropeLenRef.current = 90 * (config.widgetScale || 1)
-        startRopeSim()
-      }
+      // 绳摆延迟激活：等 pointermove 位移超阈值再挂绳（点击不触发下坠）
+      ropePendingRef.current = config.ropeMode
       setPressed(true)
       setDragging(true)
       soundRef.current?.unlock()
@@ -1052,6 +1050,14 @@ export function WhaleWidget() {
       return
     }
     trackerRef.current.push(e.clientX, e.clientY)
+    // 0.4 绳摆延迟激活：位移超过 6px 才挂绳（点击≠抓取）
+    if (ropePendingRef.current && pressStartRef.current && Math.hypot(e.clientX - pressStartRef.current.x, e.clientY - pressStartRef.current.y) > 6) {
+      ropePendingRef.current = false
+      // 运动中抓取：继承角色当前动量（甩飞中途抓住会顺势荡起来，不再瞬间停死）
+      ropeRef.current = { ax: e.clientX, ay: e.clientY, vx: roleVelRef.current.x, vy: roleVelRef.current.y }
+      ropeLenRef.current = 90 * (config.widgetScale || 1)
+      startRopeSim()
+    }
     // 0.4 绳摆：鼠标只更新锚点，角色位置由绳摆模拟推进（拖动产生摆动，松手带切向速度飞出）
     const rope = ropeRef.current
     if (rope) {
@@ -1185,6 +1191,7 @@ export function WhaleWidget() {
       // 0.4：松手速度优先取绳摆模拟的摆锤速度（真实摆动末速，比指针采样准确）
       const ropeV = ropeRef.current ? { vx: ropeRef.current.vx, vy: ropeRef.current.vy } : null
       stopRopeSim()
+      ropePendingRef.current = false
       const vel = ropeV ?? trackerRef.current.velocity()
       trackerRef.current.clear()
       dragRef.current = null
