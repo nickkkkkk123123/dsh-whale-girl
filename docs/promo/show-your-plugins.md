@@ -35,7 +35,7 @@ dsh plugin --profile desktop add dsh-whale-girl
 **值一提的技术点**：
 
 - DSH 的 webserver 对子资源请求有认证拦截，所以数据走「宿主注入桥接脚本 + 带认证 fetch + postMessage 广播」的链路，图片/音效全部 data URL
-- 已知 DSH 流式输出时的卡顿与本插件无关（DSH 前端每 token 全量重建消息），插件侧做了物理暂停等缓解
+- 曾经的 DSH 流式输出卡顿与本插件无关（DSH 前端每 token 全量重建消息），已在官方 0.2.0-rc.2 根治（动画帧合并发布，2026-10-06 验证），插件侧的物理暂停等缓解措施保留
 - 官方 Desktop 与第三方端双兼容（0.4.3 专项适配：无 slots 服务时客户端直挂 body）
 
 **占用**：空闲 ~0.6% CPU 增量、0 额外进程、省电模式空闲自动停渲染。仓库里有完整实测方法和数据，拒绝"桌宠都吃资源"的刻板印象。
@@ -80,7 +80,7 @@ dsh plugin --profile desktop add dsh-whale-girl
 **A couple of technical notes worth mentioning**
 
 - DSH's webserver blocks unauthenticated subresource requests, so data flows through a host-injected bridge script + authenticated fetch + postMessage broadcast; images/sounds are all data URLs
-- The known DSH streaming-output stutter is NOT caused by this plugin (DSH rebuilds the whole assistant message per token); the plugin mitigates with physics pause during thinking
+- The former DSH streaming-output stutter was NOT caused by this plugin (DSH rebuilt the whole assistant message per token); fixed upstream in official 0.2.0-rc.2 (animation-frame coalesced publication, verified 2026-10-06), plugin-side physics-pause mitigations retained
 - Dual compatibility: official Desktop and community builds (v0.4.3 adapted for hosts without the `slots` service — client mounts directly to body)
 
 **Footprint**: ~0.6% idle CPU delta, 0 extra processes, eco mode stops rendering when idle. Full measurement methodology in the repo — desktop pets don't have to be resource hogs.

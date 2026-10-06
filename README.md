@@ -139,13 +139,15 @@ dsh plugin --profile desktop add ./dsh-whale-girl-x.y.z.tgz
 
 > **说明**：**信息面板开启**（时间/系统资源 + 毛玻璃 + 物理跟随循环）会额外占用，强度取决于 `infoFrost` 与 `pauseOnThinking`（DSH 输出/思考时暂停面板物理，默认开）。实测（2026-08-30，v0.3.6）：面板开/关差值 ≈0.7% 单核，增量极小。
 
-## 已知问题：DSH 流式输出时挂件卡顿
+## 流式输出卡顿（✅ 已解决，2026-10-06 验证）
 
-**现象**：agent 输出长文字（流式）时，挂件（及同页 UI）在相邻 token 之间会卡顿，输出完毕立即恢复流畅。
+**历史现象**（0.1.x 时代 / 第三方桌面端）：agent 流式输出长文字时，挂件（及同页 UI）在相邻 token 之间会卡顿，输出完毕立即恢复流畅。
 
-**问题真正所在**：**不在本插件**。DSH 前端在流式输出时**每收到一个 token 就整体重建当前 assistant 消息**，占用主线程；本挂件与它同页面/同主线程，被连带卡住。
+**历史根因**：**不在本插件**。DSH 前端在流式输出时每收到一个 token 就整体重建当前 assistant 消息（`assistant.ts` 的 `updateChunk` 每 chunk 复制 blocks 并重渲染整条消息），占用主线程；本挂件与它同页面/同主线程，被连带卡住。2026-08-30 已反馈至 DSH Desktop issue #747。
 
-**本插件已做的缓解**：`thinking` 时暂停信息面板物理循环（默认开）；transform 定位（不触发 layout reflow）；物理循环减负。
+**现状**：官方 DeepSeek Harness **0.2.0-rc.2 已按 #747 建议①修复**——renderer 对流式 chunk 采用 `publication: "animation-frame"`，按动画帧合并发布（每帧最多一次视图刷新，而非每 token 一次），2026-10-06 源码验证（本地 app.asar 内 assistant/tool/turn-process/trajectory 四处定义均生效；引入提交 = 上游 8/25 `perf(conversation): fold packed assistant history`），实机观察流式输出期间挂件不再卡顿。#747 截至验证日仍处 open（上游未关闭），如在更新版本复现请跟帖反馈。
+
+**本插件原缓解措施保留**：`thinking` 时暂停信息面板物理循环（默认开）；transform 定位（不触发 layout reflow）；物理循环减负。
 
 ## 数据链路（为什么不用 fetch）
 
